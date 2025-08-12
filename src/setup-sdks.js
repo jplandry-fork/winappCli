@@ -11,7 +11,6 @@ const {
   configExists, 
   updateConfigWithDownloadResults 
 } = require('./config-utils');
-const { getWindowsAppSDKMetadataPaths } = require('./winappsdk-metadata');
 
 // List of SDK packages to download
 const SDK_PACKAGES = [
@@ -215,6 +214,157 @@ async function downloadAllSDKPackages(options = {}) {
 }
 
 /**
+ * Find all .winmd files recursively in a directory
+ * @param {string} dir - Directory to search
+ * @param {Array<string>} [results=[]] - Array to accumulate results
+ * @returns {Array<string>} - Array of .winmd file paths
+ */
+function findWinmdFiles(dir, results = []) {
+  if (!fs.existsSync(dir)) {
+    return results;
+  }
+
+  try {
+    const items = fs.readdirSync(dir, { withFileTypes: true });
+    
+    for (const item of items) {
+      const fullPath = path.join(dir, item.name);
+      
+      if (item.isDirectory()) {
+        findWinmdFiles(fullPath, results);
+      } else if (item.isFile() && item.name.endsWith('.winmd')) {
+        results.push(fullPath);
+      }
+    }
+  } catch (error) {
+    // Skip directories that can't be read
+  }
+  
+  return results;
+}
+
+/**
+ * Collect all component metadata files from all SDK packages
+ * @param {string} packagesDir - Path to the packages directory
+ * @param {boolean} [verbose=true] - Show progress messages
+ * @returns {Array<string>} - Array of .winmd file paths
+ */
+function collectWinmdFiles(packagesDir, verbose = true) {
+  const winmdFiles = [];
+  
+  if (!fs.existsSync(packagesDir)) {
+    if (verbose) {
+      console.log(`⚠️  Packages directory not found: ${packagesDir}`);
+    }
+    return winmdFiles;
+  }
+
+  // Search patterns based on the CMake example
+  const searchPatterns = [
+    '**/metadata/*.winmd',              // Standard metadata location
+    '**/metadata/10.0.18362.0/*.winmd', // Non-standard paths
+    '**/lib/*.winmd',                   // WebView2 metadata and others
+    '**/lib/uap10.0/*.winmd',          // Older WindowsAppSDK metadata
+    '**/lib/uap10.0.18362/*.winmd',    // Older WindowsAppSDK metadata
+    '**/c/References/**/*.winmd'        // Windows Platform SDK references
+  ];
+
+  if (verbose) {
+    console.log('🔍 Searching for .winmd files using patterns:');
+    searchPatterns.forEach(pattern => {
+      console.log(`  • ${pattern}`);
+    });
+  }
+
+  // Search all subdirectories in the packages folder
+  try {
+    const packageFolders = fs.readdirSync(packagesDir, { withFileTypes: true })
+      .filter(item => item.isDirectory())
+      .map(item => path.join(packagesDir, item.name));
+
+    for (const packageDir of packageFolders) {
+      const packageName = path.basename(packageDir);
+      
+      if (verbose) {
+        console.log(`\n� Searching package: ${packageName}`);
+      }
+
+      // Apply each search pattern to this package directory
+      for (const pattern of searchPatterns) {
+        const searchPath = path.join(packageDir, pattern.replace('**/', ''));
+        const baseDir = path.dirname(searchPath);
+        const fileName = path.basename(searchPath);
+        
+        // Find files matching the pattern
+        const foundFiles = findWinmdFilesWithPattern(baseDir, fileName);
+        
+        if (foundFiles.length > 0) {
+          winmdFiles.push(...foundFiles);
+          if (verbose) {
+            console.log(`  ✓ Found ${foundFiles.length} .winmd files in ${path.relative(packageDir, baseDir)}`);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    if (verbose) {
+      console.warn(`⚠️  Error reading packages directory: ${error.message}`);
+    }
+  }
+
+  // Remove duplicates and sort
+  const uniqueFiles = [...new Set(winmdFiles)].sort();
+  
+  if (verbose) {
+    console.log(`\n📋 Total unique .winmd files found: ${uniqueFiles.length}`);
+    if (uniqueFiles.length > 0) {
+      console.log('Found files:');
+      uniqueFiles.forEach((file, index) => {
+        const relativePath = path.relative(packagesDir, file);
+        console.log(`  ${index + 1}. ${relativePath}`);
+      });
+    }
+  }
+
+  return uniqueFiles;
+}
+
+/**
+ * Find .winmd files matching a pattern in a directory
+ * @param {string} baseDir - Base directory to search
+ * @param {string} pattern - File pattern (e.g., '*.winmd')
+ * @param {Array<string>} [results=[]] - Array to accumulate results
+ * @returns {Array<string>} - Array of matching .winmd file paths
+ */
+function findWinmdFilesWithPattern(baseDir, pattern, results = []) {
+  if (!fs.existsSync(baseDir)) {
+    return results;
+  }
+
+  try {
+    const items = fs.readdirSync(baseDir, { withFileTypes: true });
+    
+    for (const item of items) {
+      const fullPath = path.join(baseDir, item.name);
+      
+      if (item.isDirectory()) {
+        // Recursively search subdirectories
+        findWinmdFilesWithPattern(fullPath, pattern, results);
+      } else if (item.isFile() && item.name.endsWith('.winmd')) {
+        // Check if file matches pattern
+        if (pattern === '*.winmd' || item.name === pattern || pattern.includes('*')) {
+          results.push(fullPath);
+        }
+      }
+    }
+  } catch (error) {
+    // Skip directories that can't be read
+  }
+  
+  return results;
+}
+
+/**
  * Run CppWinRT to generate projection headers
  * @param {Object} options - Options for CppWinRT generation
  * @param {string} [options.outputDir] - Output directory for generated headers (defaults to .winsdk/generated/include in project root)
@@ -253,66 +403,26 @@ async function runCppWinRT(options = {}) {
       await downloadAllSDKPackages({ verbose });
     }
 
-    // Get package paths
-    const cppWinRTPath = getPackagePath('Microsoft.Windows.CppWinRT');
-    const winAppSdkPath = getPackagePath('Microsoft.WindowsAppSDK');
-    const winPlatSdkPath = getPackagePath('Microsoft.Windows.SDK.CPP');
-
+    // Get the packages directory by getting any package path and going up one level
+    const cppWinrtPackagePath = getPackagePath('Microsoft.Windows.CppWinRT');
+    if (!cppWinrtPackagePath) {
+      throw new Error('Required SDK packages not found. Please run setup first.');
+    }
+    
+    const packagesDir = path.dirname(cppWinrtPackagePath);
+    
     // Find cppwinrt.exe
-    const cppwinrtExePath = path.join(cppWinRTPath, 'bin', 'cppwinrt.exe');
+    const cppwinrtExePath = path.join(cppWinrtPackagePath, 'bin', 'cppwinrt.exe');
     if (!fs.existsSync(cppwinrtExePath)) {
       throw new Error(`cppwinrt.exe not found at ${cppwinrtExePath}`);
     }
 
-    // Get WindowsAppSDK version from the path
-    const winAppSdkFolderName = path.basename(winAppSdkPath);
-    const winAppSdkVersion = winAppSdkFolderName.substring('Microsoft.WindowsAppSDK.'.length);
+    // Collect all .winmd files from all SDK packages
+    const winmdFiles = collectWinmdFiles(packagesDir, verbose);
     
-    if (verbose) {
-      console.log(`🔍 Detected WindowsAppSDK version: ${winAppSdkVersion}`);
+    if (winmdFiles.length === 0) {
+      throw new Error('No .winmd files found in SDK packages');
     }
-
-    // Get WindowsAppSDK metadata paths using the new helper function
-    const winAppSdkLibPaths = await getWindowsAppSDKMetadataPaths(winAppSdkPath, winAppSdkVersion, verbose);
-
-    // Find latest version in Windows SDK References folder
-    let winPlatSdkReferencesPath = null;
-    const winPlatSdkReferencesDir = path.join(winPlatSdkPath, 'c', 'References');
-    if (fs.existsSync(winPlatSdkReferencesDir)) {
-      const refVersions = fs.readdirSync(winPlatSdkReferencesDir)
-        .filter(item => fs.statSync(path.join(winPlatSdkReferencesDir, item)).isDirectory())
-        .filter(item => /^\d+\.\d+\.\d+\.\d+$/.test(item)) // Match version pattern
-        .sort((a, b) => {
-          const aParts = a.split('.').map(Number);
-          const bParts = b.split('.').map(Number);
-          for (let i = 0; i < 4; i++) {
-            if (aParts[i] !== bParts[i]) {
-              return bParts[i] - aParts[i]; // Descending order for latest first
-            }
-          }
-          return 0;
-        });
-      
-      if (refVersions.length > 0) {
-        winPlatSdkReferencesPath = path.join(winPlatSdkReferencesDir, refVersions[0]);
-        if (verbose) {
-          console.log(`Found Windows SDK References version: ${refVersions[0]}`);
-        }
-      }
-    }
-
-    // Combine all input paths
-    const inputPaths = [
-      ...winAppSdkLibPaths,
-      winPlatSdkReferencesPath
-    ].filter(p => p && fs.existsSync(p)); // Only include paths that exist and are not null
-
-    if (inputPaths.length === 0) {
-      throw new Error('No valid input paths found for cppwinrt');
-    }
-
-    const input = `"${inputPaths.join('" "')}"`;
-    const reference = winAppSdkLibPaths.length > 0 ? path.dirname(winAppSdkLibPaths[0]) : path.join(winAppSdkPath, 'lib');
 
     // Ensure output directory exists
     if (!fs.existsSync(finalOutputDir)) {
@@ -320,36 +430,42 @@ async function runCppWinRT(options = {}) {
     }
 
     if (verbose) {
-      console.log(`CppWinRT executable: ${cppwinrtExePath}`);
-      console.log(`WindowsAppSDK input paths (${inputPaths.filter(p => p.includes('WindowsAppSDK')).length}):`)
-      inputPaths.filter(p => p.includes('WindowsAppSDK')).forEach(p => {
-        console.log(`  • ${p}`);
-      });
-      if (winPlatSdkReferencesPath) {
-        console.log(`Windows SDK References path: ${winPlatSdkReferencesPath}`);
-      }
-      console.log(`Reference path: ${reference}`);
-      console.log(`Output directory: ${finalOutputDir}`);
-      console.log('Calling cppwinrt.exe...');
+      console.log(`\n🔧 CppWinRT Configuration:`);
+      console.log(`  Executable: ${cppwinrtExePath}`);
+      console.log(`  Packages directory: ${packagesDir}`);
+      console.log(`  Output directory: ${finalOutputDir}`);
+      console.log(`  Input .winmd files: ${winmdFiles.length}`);
     }
 
-    // Build the cppwinrt command
-    const command = `${cppwinrtExePath} -input ${input} -reference "${reference}" -output "${finalOutputDir}"`;
+    // Build the cppwinrt command arguments
+    const args = [
+      '-input', 'sdk+', // Start with SDK
+      ...winmdFiles.flatMap(winmd => ['-input', `"${winmd}"`]), // Add each .winmd file
+      '-optimize',
+      '-output', `"${finalOutputDir}"`,
+      '-verbose'
+    ];
+
+    // Build the full command
+    const command = `"${cppwinrtExePath}" ${args.join(' ')}`;
     
     if (verbose) {
-      console.log(`Command: ${command}`);
+      console.log(`\n🚀 Executing CppWinRT command:`);
+      console.log(`${command}`);
+      console.log('');
     }
 
     // Execute cppwinrt
     const result = execSync(command, { 
       cwd: __dirname,
       stdio: verbose ? 'inherit' : 'pipe',
-      encoding: 'utf8'
+      encoding: 'utf8',
+      shell: true // Use shell to handle quotes properly
     });
 
     if (verbose) {
       console.log('✅ CppWinRT generation completed successfully!');
-      console.log(`Generated headers available at: ${finalOutputDir}`);
+      console.log(`📁 Generated headers available at: ${finalOutputDir}`);
     }
 
   } catch (error) {

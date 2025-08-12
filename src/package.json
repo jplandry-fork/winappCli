@@ -9,8 +9,7 @@
   "scripts": {
     "setup": "node setup-sdks.js",
     "download-buildtools": "node run-buildtool.js",
-    "test": "node examples/test-buildtools.js",
-    "postinstall": "node setup-sdks.js --postinstall"
+    "test": "node examples/test-buildtools.js"
   },
   "keywords": [
     "windows",
