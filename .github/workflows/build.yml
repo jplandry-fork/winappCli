@@ -7,27 +7,57 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
+  build-and-package:
     runs-on: windows-latest
-    strategy:
-      matrix:
-        architecture: [x64, arm64]
     steps:
     - name: Checkout
       uses: actions/checkout@v5
       with:
         fetch-depth: 0
+    
     - name: Install .NET Core
       uses: actions/setup-dotnet@v5
       with:
         dotnet-version: 9.0.x
-    - name: Build CLI
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v5
+      with:
+        node-version: '24'
+    
+    - name: Build CLI solution
       run: dotnet build src\winsdk-CLI\winsdk.sln -c Release
+    
     # Todo: Add tests
-    - name: Publish CLI
-      run: dotnet publish src\winsdk-CLI\Winsdk.Cli\Winsdk.Cli.csproj -c Release -r win-${{ matrix.architecture }}
-    - name: Upload CLI build artifacts
+    
+    - name: Build complete npm package
+      run: |
+        cd src\winsdk-npm
+        npm run build
+    
+    - name: Upload CLI binaries
       uses: actions/upload-artifact@v4
       with:
-        name: CLI-Release-${{ matrix.architecture }}
-        path: src\winsdk-CLI\Winsdk.Cli\bin\Release\net9.0\win-${{ matrix.architecture }}\publish\
+        name: cli-binaries
+        path: src\winsdk-npm\bin\
+    
+    - name: Create npm package
+      run: |
+        cd src\winsdk-npm
+        npm pack
+    
+    - name: Upload npm package artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: npm-package
+        path: |
+          src/winsdk-npm/**
+          !src/winsdk-npm/bin/**/*.pdb
+          !src/winsdk-npm/node_modules/**
+          !src/winsdk-npm/*.tgz
+    
+    - name: Upload npm tarball
+      uses: actions/upload-artifact@v4
+      with:
+        name: npm-tarball
+        path: src\winsdk-npm\*.tgz

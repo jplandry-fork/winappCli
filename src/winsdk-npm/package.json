@@ -8,7 +8,12 @@
   },
   "scripts": {
     "setup": "node cli.js setup",
-    "test": "node examples/test-buildtools.js"
+    "test": "node examples/test-buildtools.js",
+    "build": "npm run build-x64 && npm run build-arm64",
+    "build-x64": "dotnet publish ../winsdk-CLI/Winsdk.Cli/Winsdk.Cli.csproj -c Release -r win-x64 --self-contained -o bin/win-x64",
+    "build-arm64": "dotnet publish ../winsdk-CLI/Winsdk.Cli/Winsdk.Cli.csproj -c Release -r win-arm64 --self-contained -o bin/win-arm64",
+    "clean": "node -e \"require('fs').rmSync('bin', {recursive: true, force: true})\"",
+    "postinstall": "node -e \"console.log('\\\\n🎉 Windows SDK utilities installed successfully!\\\\n\\\\nGet started with: npx winsdk --help\\\\n')\""
   },
   "keywords": [
     "windows",
@@ -42,6 +47,7 @@
     "addon-utils.js",
     "addon-template/",
     "utils.js",
+    "bin/**/*.exe",
     "README.md",
     "LICENSE"
   ]
