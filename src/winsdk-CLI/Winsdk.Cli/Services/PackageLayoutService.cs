@@ -68,6 +68,12 @@ internal sealed class PackageLayoutService
                 results.Add(Path.GetFullPath(f));
         }
 
+        foreach (var refDir in SafeEnumDirs(pkgsDir, "References", SearchOption.AllDirectories))
+        {
+            foreach (var f in SafeEnumFiles(refDir, "*.winmd", SearchOption.AllDirectories))
+                results.Add(Path.GetFullPath(f));
+        }
+
         return results;
     }
 

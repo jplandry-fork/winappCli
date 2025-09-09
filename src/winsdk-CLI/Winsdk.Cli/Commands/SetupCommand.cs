@@ -14,6 +14,12 @@ internal class SetupCommand : Command
 
     public SetupCommand() : base("setup", "Download and setup Windows SDKs")
     {
+        var baseDirectoryArgument = new Argument<string>("base-directory")
+        {
+            Description = "Base/root directory for the winsdk workspace",
+            Arity = ArgumentArity.ZeroOrOne,
+            DefaultValueFactory = (argumentResult) => Directory.GetCurrentDirectory()
+        };
         var experimentalOption = new Option<bool>("--experimental")
         {
             Description = "Include experimental/prerelease packages from NuGet"
@@ -21,10 +27,6 @@ internal class SetupCommand : Command
         var ignoreConfigOption = new Option<bool>("--ignore-config", "--no-config")
         {
             Description = "Don't use configuration file for version management"
-        };
-        var noCleanupOption = new Option<bool>("--no-cleanup", "--keep-old-versions")
-        {
-            Description = "Keep old package versions instead of cleaning them up"
         };
         var noGitignoreOption = new Option<bool>("--no-gitignore")
         {
@@ -48,9 +50,9 @@ internal class SetupCommand : Command
             }
         };
 
+        Arguments.Add(baseDirectoryArgument);
         Options.Add(experimentalOption);
         Options.Add(ignoreConfigOption);
-        Options.Add(noCleanupOption);
         Options.Add(noGitignoreOption);
         Options.Add(quietOption);
         Options.Add(yesOption);
@@ -58,16 +60,15 @@ internal class SetupCommand : Command
 
         SetAction(async (parseResult, ct) =>
         {
+            var baseDirectory = parseResult.GetRequiredValue(baseDirectoryArgument);
             var experimental = parseResult.GetValue(experimentalOption);
             var ignoreConfig = parseResult.GetValue(ignoreConfigOption);
-            var noCleanup = parseResult.GetValue(noCleanupOption);
             var noGitignore = parseResult.GetValue(noGitignoreOption);
             var quiet = parseResult.GetValue(quietOption);
             var assumeYes = parseResult.GetValue(yesOption);
-            var arch = parseResult.GetValue(archOption);
+            var arch = parseResult.GetRequiredValue(archOption);
 
-            var cwd = Directory.GetCurrentDirectory();
-            var winsdkDir = Path.Combine(cwd, ".winsdk");
+            var winsdkDir = Path.Combine(baseDirectory, ".winsdk");
             var pkgsDir = Path.Combine(winsdkDir, "packages");
             var includeOut = Path.Combine(winsdkDir, "include");
             var libOut = Path.Combine(winsdkDir, "lib");
@@ -76,20 +77,15 @@ internal class SetupCommand : Command
             Directory.CreateDirectory(includeOut);
             Directory.CreateDirectory(libOut);
             Directory.CreateDirectory(binOut);
-            Console.WriteLine($"{UiSymbols.Rocket} winsdk init starting in {cwd}");
+            Console.WriteLine($"{UiSymbols.Rocket} winsdk init starting in {baseDirectory}");
             Console.WriteLine($"{UiSymbols.Folder} Workspace → {winsdkDir}");
-
-            if (noCleanup)
-            {
-                Console.WriteLine($"{UiSymbols.Package} Old package versions will be kept");
-            }
 
             if (experimental)
             {
                 Console.WriteLine($"{UiSymbols.Wrench} Experimental/prerelease packages will be included");
             }
 
-            var config = new ConfigService(cwd);
+            var config = new ConfigService(baseDirectory);
             var nuget = new NugetService();
             var cppwinrt = new CppWinrtService();
             var usedVersions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -126,40 +122,29 @@ internal class SetupCommand : Command
             }
             await nuget.EnsureNugetExeAsync(ct);
 
-            // 1) Resolve all versions first (pinned vs latest)
             foreach (var pkg in NugetService.SDK_PACKAGES)
             {
                 string version;
                 if (!ignoreConfig && config.Exists())
                 {
                     var v = pinned.GetVersion(pkg);
-                    version = string.IsNullOrWhiteSpace(v) ? await nuget.GetLatestVersionAsync(pkg, experimental, ct)
-                                                           : v!;
+                    if (string.IsNullOrWhiteSpace(v))
+                    {
+                        version = await nuget.GetLatestVersionAsync(pkg, experimental, ct);
+                    }
+                    else
+                    {
+                        version = v!;
+                    }
                 }
                 else
                 {
                     version = await nuget.GetLatestVersionAsync(pkg, experimental, ct);
                 }
 
-                if (!quiet)
-                {
-                    Console.WriteLine($"  {UiSymbols.Bullet} {pkg} {version}");
-                }
+                Console.WriteLine($"  {UiSymbols.Bullet} {pkg} {version}");
+                await nuget.InstallPackageAsync(pkg, version, pkgsDir, ct);
                 usedVersions[pkg] = version;
-            }
-
-            // 2) Single bulk install using a temp packages.config
-            await nuget.InstallPackagesFromConfigAsync(
-                usedVersions, 
-                pkgsDir, 
-                cleanupOldVersions: !noCleanup, 
-                verbose: !quiet,
-                cancellationToken: ct);
-
-            // Note: Cleanup functionality is now implemented in NugetService
-            if (!noCleanup && !quiet)
-            {
-                Console.WriteLine($"{UiSymbols.Check} Package cleanup completed");
             }
 
             // Prepare consolidated layout and run cppwinrt
@@ -229,12 +214,12 @@ internal class SetupCommand : Command
                 finalConfig.SetVersion(kvp.Key, kvp.Value);
             }
             config.Save(finalConfig);
-            Console.WriteLine($"{UiSymbols.Save} Wrote config → {Path.Combine(cwd, "winsdk.yaml")}");
+            Console.WriteLine($"{UiSymbols.Save} Wrote config → {Path.Combine(baseDirectory, "winsdk.yaml")}");
 
             // Update .gitignore to exclude .winsdk folder (unless --no-gitignore is specified)
             if (!noGitignore)
             {
-                GitignoreService.UpdateGitignore(cwd, verbose: !quiet);
+                GitignoreService.UpdateGitignore(baseDirectory, verbose: !quiet);
             }
 
             Console.WriteLine($"{UiSymbols.Party} winsdk init completed.");
