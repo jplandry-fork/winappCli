@@ -16,8 +16,12 @@ internal class SetupCommand : Command
     {
         var baseDirectoryArgument = new Argument<string>("base-directory")
         {
-            Description = "Base/root directory for the winsdk workspace",
-            Arity = ArgumentArity.ZeroOrOne,
+            Description = "Base/root directory for the winsdk workspace, for consumption or installation.",
+            Arity = ArgumentArity.ZeroOrOne
+        };
+        var configDirOption = new Option<string>("--config-dir")
+        {
+            Description = "Directory to read/store configuration (default: current directory)",
             DefaultValueFactory = (argumentResult) => Directory.GetCurrentDirectory()
         };
         var experimentalOption = new Option<bool>("--experimental")
@@ -51,6 +55,7 @@ internal class SetupCommand : Command
         };
 
         Arguments.Add(baseDirectoryArgument);
+        Options.Add(configDirOption);
         Options.Add(experimentalOption);
         Options.Add(ignoreConfigOption);
         Options.Add(noGitignoreOption);
@@ -61,7 +66,8 @@ internal class SetupCommand : Command
 
         SetAction(async (parseResult, ct) =>
         {
-            var baseDirectory = parseResult.GetRequiredValue(baseDirectoryArgument);
+            var baseDirectory = parseResult.GetValue(baseDirectoryArgument);
+            var configDir = parseResult.GetRequiredValue(configDirOption);
             var experimental = parseResult.GetValue(experimentalOption);
             var ignoreConfig = parseResult.GetValue(ignoreConfigOption);
             var noGitignore = parseResult.GetValue(noGitignoreOption);
@@ -70,7 +76,13 @@ internal class SetupCommand : Command
             var arch = parseResult.GetRequiredValue(archOption);
             var verbose = parseResult.GetValue(Program.VerboseOption);
 
-            var winsdkDir = Path.Combine(baseDirectory, ".winsdk");
+            var winsdkDir = BuildToolsService.FindWinsdkDirectory(baseDirectory);
+
+            if (!Directory.Exists(winsdkDir))
+            {
+                Directory.CreateDirectory(winsdkDir);
+            }
+
             var pkgsDir = Path.Combine(winsdkDir, "packages");
             var includeOut = Path.Combine(winsdkDir, "include");
             var libOut = Path.Combine(winsdkDir, "lib");
@@ -79,6 +91,10 @@ internal class SetupCommand : Command
             Directory.CreateDirectory(includeOut);
             Directory.CreateDirectory(libOut);
             Directory.CreateDirectory(binOut);
+            
+            var config = new ConfigService(configDir);
+
+            Console.WriteLine($"{UiSymbols.Rocket} using config → {config.ConfigPath}");
             Console.WriteLine($"{UiSymbols.Rocket} winsdk init starting in {baseDirectory}");
             Console.WriteLine($"{UiSymbols.Folder} Workspace → {winsdkDir}");
 
@@ -87,12 +103,11 @@ internal class SetupCommand : Command
                 Console.WriteLine($"{UiSymbols.Wrench} Experimental/prerelease packages will be included");
             }
 
-            var config = new ConfigService(baseDirectory);
             var nuget = new NugetService();
             var cppwinrt = new CppWinrtService();
             var usedVersions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-            WinsdkConfig pinned = new WinsdkConfig();
+            WinsdkConfig pinned = new();
 
             if (quiet && verbose)
             {
@@ -128,7 +143,7 @@ internal class SetupCommand : Command
             {
                 Console.WriteLine($"{UiSymbols.Package} Installing SDK packages → {pkgsDir}");
             }
-            await nuget.EnsureNugetExeAsync(ct);
+            await nuget.EnsureNugetExeAsync(winsdkDir, ct);
 
             foreach (var pkg in NugetService.SDK_PACKAGES)
             {
@@ -151,7 +166,7 @@ internal class SetupCommand : Command
                 }
 
                 Console.WriteLine($"  {UiSymbols.Bullet} {pkg} {version}");
-                await nuget.InstallPackageAsync(pkg, version, pkgsDir, ct);
+                await nuget.InstallPackageAsync(winsdkDir, pkg, version, pkgsDir, ct);
                 usedVersions[pkg] = version;
             }
 
@@ -244,12 +259,16 @@ internal class SetupCommand : Command
                 finalConfig.SetVersion(kvp.Key, kvp.Value);
             }
             config.Save(finalConfig);
-            Console.WriteLine($"{UiSymbols.Save} Wrote config → {Path.Combine(baseDirectory, "winsdk.yaml")}");
+            Console.WriteLine($"{UiSymbols.Save} Wrote config → {config.ConfigPath}");
 
             // Update .gitignore to exclude .winsdk folder (unless --no-gitignore is specified)
             if (!noGitignore)
             {
-                GitignoreService.UpdateGitignore(baseDirectory, verbose: !quiet);
+                var path = new DirectoryInfo(winsdkDir);
+                if (path.Parent != null)
+                {
+                    GitignoreService.UpdateGitignore(path.Parent.FullName, verbose: !quiet);
+                }
             }
 
             Console.WriteLine($"{UiSymbols.Party} winsdk init completed.");

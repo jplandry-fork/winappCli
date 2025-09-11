@@ -21,10 +21,9 @@ internal sealed class NugetService
         "Microsoft.Windows.SDK.CPP.arm64"
     };
 
-    public async Task EnsureNugetExeAsync(CancellationToken cancellationToken = default)
+    public async Task EnsureNugetExeAsync(string winsdkDir, CancellationToken cancellationToken = default)
     {
-        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var toolsDir = Path.Combine(userProfile, ".winsdk", "tools");
+        var toolsDir = Path.Combine(winsdkDir, "tools");
         var nugetExe = Path.Combine(toolsDir, "nuget.exe");
         if (File.Exists(nugetExe))
             return;
@@ -63,10 +62,9 @@ internal sealed class NugetService
         return list[^1];
     }
 
-    public async Task InstallPackageAsync(string package, string version, string outputDir, CancellationToken cancellationToken = default)
+    public async Task InstallPackageAsync(string winsdkDir, string package, string version, string outputDir, CancellationToken cancellationToken = default)
     {
-        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var nugetExe = Path.Combine(userProfile, ".winsdk", "tools", "nuget.exe");
+        var nugetExe = Path.Combine(winsdkDir, "tools", "nuget.exe");
         if (!File.Exists(nugetExe))
             throw new FileNotFoundException("nuget.exe missing; call EnsureNugetExeAsync first", nugetExe);
 

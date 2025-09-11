@@ -11,7 +11,7 @@ internal static class BuildToolsService
     private static string GetCurrentArchitecture()
     {
         var arch = RuntimeInformation.ProcessArchitecture;
-        
+
         // Map .NET architecture names to BuildTools folder names
         return arch switch
         {
@@ -23,21 +23,33 @@ internal static class BuildToolsService
         };
     }
 
-    private static string? FindWinsdkDirectory(string? startPath = null)
+    private static string GetDefaultWinsdkDirectory()
     {
-        var currentDir = new DirectoryInfo(startPath ?? Directory.GetCurrentDirectory());
-        
-        while (currentDir != null)
+        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var winsdkDir = Path.Combine(userProfile, ".winsdk");
+        return winsdkDir;
+    }
+
+    internal static string FindWinsdkDirectory(string? baseDirectoryStr = null)
+    {
+        if (!string.IsNullOrEmpty(baseDirectoryStr))
         {
-            var winsdkPath = Path.Combine(currentDir.FullName, ".winsdk");
-            if (Directory.Exists(winsdkPath))
+            var originalBaseDir = new DirectoryInfo(baseDirectoryStr);
+            var baseDirectory = originalBaseDir;
+            while (baseDirectory != null)
             {
-                return winsdkPath;
+                var winsdkDirectory = Path.Combine(baseDirectory.FullName, ".winsdk");
+                if (Directory.Exists(winsdkDirectory))
+                {
+                    return winsdkDirectory;
+                }
+                baseDirectory = baseDirectory.Parent;
             }
-            currentDir = currentDir.Parent;
+
+            return Path.Combine(originalBaseDir.FullName, ".winsdk");
         }
-        
-        return null;
+
+        return GetDefaultWinsdkDirectory();
     }
 
     private static string? FindBuildToolsBinPath(string winsdkDir)
@@ -79,7 +91,7 @@ internal static class BuildToolsService
         // Determine architecture based on current machine
         var currentArch = GetCurrentArchitecture();
         var archPath = Path.Combine(latestVersion, currentArch);
-        
+
         if (Directory.Exists(archPath))
         {
             return archPath;
@@ -124,11 +136,11 @@ internal static class BuildToolsService
     /// Get the full path to a specific BuildTools executable
     /// </summary>
     /// <param name="toolName">Name of the tool (e.g., 'mt.exe', 'signtool.exe')</param>
-    /// <param name="startPath">Starting directory to search for .winsdk (defaults to current directory)</param>
+    /// <param name="baseDirectory">Starting directory to search for .winsdk (defaults to user profile directory)</param>
     /// <returns>Full path to the executable</returns>
-    public static string? GetBuildToolPath(string toolName, string? startPath = null)
+    public static string? GetBuildToolPath(string toolName, string? baseDirectory = null)
     {
-        var winsdkDir = FindWinsdkDirectory(startPath);
+        var winsdkDir = FindWinsdkDirectory(baseDirectory);
         if (winsdkDir == null)
             return null;
 
@@ -146,13 +158,13 @@ internal static class BuildToolsService
     /// <param name="toolName">Name of the tool (e.g., 'mt.exe', 'signtool.exe')</param>
     /// <param name="arguments">Arguments to pass to the tool</param>
     /// <param name="verbose">Whether to output verbose information</param>
-    /// <param name="startPath">Starting directory to search for .winsdk (defaults to current directory)</param>
+    /// <param name="baseDirectory">Starting directory to search for .winsdk (defaults to user profile directory)</param>
     /// <returns>Task representing the asynchronous operation</returns>
-    public static async Task RunBuildToolAsync(string toolName, string arguments, bool verbose = false, string? startPath = null, CancellationToken cancellationToken = default)
+    public static async Task RunBuildToolAsync(string toolName, string arguments, bool verbose = false, string? baseDirectory = null, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var toolPath = GetBuildToolPath(toolName, startPath);
+        var toolPath = GetBuildToolPath(toolName, baseDirectory);
         if (toolPath == null)
         {
             throw new FileNotFoundException($"Could not find {toolName}. Make sure the Microsoft.Windows.SDK.BuildTools package is installed in a .winsdk directory.");

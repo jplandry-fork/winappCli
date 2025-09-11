@@ -4,25 +4,26 @@ namespace Winsdk.Cli;
 
 internal sealed class ConfigService
 {
-    private readonly string _configPath;
+    public string ConfigPath { get; }
+
     public ConfigService(string workingDir)
     {
-        _configPath = Path.Combine(workingDir, "winsdk.yaml");
+        ConfigPath = Path.Combine(workingDir, "winsdk.yaml");
     }
 
-    public bool Exists() => File.Exists(_configPath);
+    public bool Exists() => File.Exists(ConfigPath);
 
     public WinsdkConfig Load()
     {
         if (!Exists()) return new WinsdkConfig();
-        var text = File.ReadAllText(_configPath);
+        var text = File.ReadAllText(ConfigPath);
         return Parse(text);
     }
 
     public void Save(WinsdkConfig cfg)
     {
         var yaml = Stringify(cfg);
-        File.WriteAllText(_configPath, yaml, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        File.WriteAllText(ConfigPath, yaml, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
     }
 
     private static WinsdkConfig Parse(string yaml)
