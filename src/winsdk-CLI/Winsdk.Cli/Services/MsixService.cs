@@ -352,6 +352,9 @@ internal class MsixService
             }
         }
 
+        // Clean the resolved package name to ensure it meets MSIX schema requirements
+        finalPackageName = ManifestService.CleanPackageName(finalPackageName);
+
         var outputMsixPath = Path.Combine(outputFolder, $"{finalPackageName}.msix");
 
         if (verbose)

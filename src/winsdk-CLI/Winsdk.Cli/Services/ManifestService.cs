@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace Winsdk.Cli.Services;
 
 internal class ManifestService
@@ -64,6 +66,8 @@ internal class ManifestService
             Console.WriteLine($"Logo path: {logoPath ?? "None"}");
         }
 
+        packageName = CleanPackageName(packageName);
+
         // Generate complete manifest using shared service
         await ManifestTemplateService.GenerateCompleteManifestAsync(
             directory,
@@ -81,6 +85,56 @@ internal class ManifestService
         {
             await CopyLogoAsAdditionalAssetAsync(directory, logoPath, verbose, cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Cleans and sanitizes a package name to meet MSIX AppxManifest schema requirements.
+    /// Based on ST_PackageName type which restricts ST_AsciiIdentifier.
+    /// </summary>
+    /// <param name="packageName">The package name to clean</param>
+    /// <returns>A cleaned package name that meets MSIX schema requirements</returns>
+    internal static string CleanPackageName(string packageName)
+    {
+        if (string.IsNullOrWhiteSpace(packageName))
+        {
+            return "DefaultPackage";
+        }
+
+        // Trim whitespace
+        var cleaned = packageName.Trim();
+
+        // Remove invalid characters (keep only letters, numbers, hyphens, underscores, periods, and spaces)
+        // ST_AllowedAsciiCharSet pattern="[-_. A-Za-z0-9]+"
+        cleaned = Regex.Replace(cleaned, @"[^A-Za-z0-9\-_. ]", "");
+
+        // Remove leading underscores (ST_AsciiIdentifier restriction)
+        cleaned = cleaned.TrimStart('_');
+
+        // If still empty or whitespace after cleaning, use default
+        if (string.IsNullOrWhiteSpace(cleaned))
+        {
+            cleaned = "DefaultPackage";
+        }
+
+        // Ensure minimum length of 3 characters
+        if (cleaned.Length < 3)
+        {
+            cleaned = cleaned.PadRight(3, '1'); // Pad with '1' to reach minimum length
+        }
+
+        // Truncate to maximum length of 50 characters
+        if (cleaned.Length > 50)
+        {
+            cleaned = cleaned.Substring(0, 50).TrimEnd(); // Trim end in case we cut off mid-word
+        }
+
+        // Final check: ensure it doesn't start with underscore after all transformations
+        if (cleaned.StartsWith('_'))
+        {
+            cleaned = string.Concat("App", cleaned.AsSpan(1));
+        }
+
+        return cleaned;
     }
 
     private async Task CopyLogoAsAdditionalAssetAsync(string directory, string logoPath, bool verbose, CancellationToken cancellationToken = default)
