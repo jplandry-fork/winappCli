@@ -6,8 +6,14 @@ using Winsdk.Cli.Services;
 
 namespace Winsdk.Cli;
 
-internal sealed class MsixService
+internal class MsixService
 {
+    private readonly BuildToolsService _buildToolsService;
+
+    public MsixService(BuildToolsService buildToolsService)
+    {
+        _buildToolsService = buildToolsService;
+    }
     public async Task GenerateMsixAssetsAsync(bool isSparse, string outputDir, string? packageName, string? publisherName, string description, string version, string? executable, CancellationToken cancellationToken = default)
     {
         var defaults = new SystemDefaultsService();
@@ -260,7 +266,7 @@ internal sealed class MsixService
 
         try
         {
-            await BuildToolsService.RunBuildToolAsync("makepri.exe", arguments, verbose, cancellationToken: cancellationToken);
+            await _buildToolsService.RunBuildToolAsync("makepri.exe", arguments, verbose, cancellationToken: cancellationToken);
 
             if (verbose)
             {
@@ -307,7 +313,7 @@ internal sealed class MsixService
 
         try
         {
-            await BuildToolsService.RunBuildToolAsync("makepri.exe", arguments, verbose, cancellationToken: cancellationToken);
+            await _buildToolsService.RunBuildToolAsync("makepri.exe", arguments, verbose, cancellationToken: cancellationToken);
 
             if (verbose)
             {
@@ -427,7 +433,7 @@ internal sealed class MsixService
                 Console.WriteLine("Creating MSIX package...");
             }
 
-            await BuildToolsService.RunBuildToolAsync("makeappx.exe", makeappxArguments, verbose, cancellationToken: cancellationToken);
+            await _buildToolsService.RunBuildToolAsync("makeappx.exe", makeappxArguments, verbose, cancellationToken: cancellationToken);
 
             var certPath = certificatePath;
             CertificateServices.CertificateResult? certInfo = null;
@@ -435,7 +441,7 @@ internal sealed class MsixService
             // Handle certificate generation and signing
             if (autoSign)
             {
-                var certificateService = new CertificateServices();
+                var certificateService = new CertificateServices(_buildToolsService);
 
                 if (string.IsNullOrWhiteSpace(certPath) && generateDevCert)
                 {
@@ -509,10 +515,10 @@ internal sealed class MsixService
         }
     }
 
-    private static async Task RunMtToolAsync(string arguments, bool verbose, CancellationToken cancellationToken = default)
+    private async Task RunMtToolAsync(string arguments, bool verbose, CancellationToken cancellationToken = default)
     {
         // Use the new BuildToolsService to run mt.exe
-        await BuildToolsService.RunBuildToolAsync("mt.exe", arguments, verbose, cancellationToken: cancellationToken);
+        await _buildToolsService.RunBuildToolAsync("mt.exe", arguments, verbose, cancellationToken: cancellationToken);
     }
 
     private static void TryDeleteFile(string path)

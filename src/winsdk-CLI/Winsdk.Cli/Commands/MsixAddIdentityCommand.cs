@@ -5,8 +5,13 @@ namespace Winsdk.Cli.Commands;
 
 internal class MsixAddIdentityCommand : Command
 {
+    private readonly MsixService _msixService;
+
     public MsixAddIdentityCommand() : base("add-identity-to-exe", "Add MSIX identity to an existing executable")
     {
+        var configService = new ConfigService(Directory.GetCurrentDirectory());
+        var buildToolsService = new BuildToolsService(configService);
+        _msixService = new MsixService(buildToolsService);
         var executableArgument = new Argument<string>("executable")
         {
             Description = "Path to the executable file",
@@ -43,8 +48,7 @@ internal class MsixAddIdentityCommand : Command
 
             try
             {
-                var msix = new MsixService();
-                var result = await msix.AddMsixIdentityToExeAsync(executablePath, manifestPath, tempDir, verbose, ct);
+                var result = await _msixService.AddMsixIdentityToExeAsync(executablePath, manifestPath, tempDir, verbose, ct);
 
                 Console.WriteLine("✅ MSIX identity added successfully!");
                 Console.WriteLine($"📦 Package: {result.PackageName}");

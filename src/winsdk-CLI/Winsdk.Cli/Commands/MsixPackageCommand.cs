@@ -5,10 +5,14 @@ namespace Winsdk.Cli.Commands;
 
 internal class MsixPackageCommand : Command
 {
+    private readonly MsixService _msixService;
 
     public MsixPackageCommand()
         : base("package", "Create an MSIX package from a prepared package directory")
     {
+        var configService = new ConfigService(Directory.GetCurrentDirectory());
+        var buildToolsService = new BuildToolsService(configService);
+        _msixService = new MsixService(buildToolsService);
         var inputFolderArgument = new Argument<string>("input-folder")
         {
             Description = "Input folder with package layout"
@@ -80,9 +84,7 @@ internal class MsixPackageCommand : Command
                 // Auto-sign if certificate is provided or if generate-cert is specified
                 var autoSign = !string.IsNullOrEmpty(certPath) || generateCert;
 
-                var msix = new MsixService();
-
-                var result = await msix.CreateMsixPackageAsync(inputFolder, outputFolder, name, skipPri, autoSign, certPath, certPassword, generateCert, installCert, publisher, verbose, ct);
+                var result = await _msixService.CreateMsixPackageAsync(inputFolder, outputFolder, name, skipPri, autoSign, certPath, certPassword, generateCert, installCert, publisher, verbose, ct);
 
                 Console.WriteLine("✅ MSIX package created successfully!");
 

@@ -3,16 +3,16 @@ using System.Text.Json;
 
 namespace Winsdk.Cli;
 
-internal sealed class NugetService
+internal class NugetService
 {
-    private static readonly HttpClient Http = new HttpClient();
+    private static readonly HttpClient Http = new();
     private const string NugetExeUrl = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe";
     private const string FlatIndex = "https://api.nuget.org/v3-flatcontainer";
 
     public static readonly string[] SDK_PACKAGES = new[]
     {
         "Microsoft.Windows.CppWinRT",
-        "Microsoft.Windows.SDK.BuildTools",
+        BuildToolsService.BUILD_TOOLS_PACKAGE,
         "Microsoft.WindowsAppSDK",
         "Microsoft.UI.Xaml",
         "Microsoft.Windows.ImplementationLibrary",
@@ -66,7 +66,9 @@ internal sealed class NugetService
     {
         var nugetExe = Path.Combine(winsdkDir, "tools", "nuget.exe");
         if (!File.Exists(nugetExe))
+        {
             throw new FileNotFoundException("nuget.exe missing; call EnsureNugetExeAsync first", nugetExe);
+        }
 
         Directory.CreateDirectory(outputDir);
 

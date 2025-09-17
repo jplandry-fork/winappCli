@@ -4,8 +4,13 @@ namespace Winsdk.Cli.Commands;
 
 internal class MsixInitCommand : Command
 {
+    private readonly MsixService _msixService;
+
     public MsixInitCommand() : base("init", "Initialize MSIX package assets")
     {
+        var configService = new ConfigService(Directory.GetCurrentDirectory());
+        var buildToolsService = new BuildToolsService(configService);
+        _msixService = new MsixService(buildToolsService);
         var sparseOption = new Option<bool>("--sparse")
         {
             Description = "Generate sparse package manifest"
@@ -56,8 +61,7 @@ internal class MsixInitCommand : Command
             var version = parseResult.GetRequiredValue(versionOption);
             var executable = parseResult.GetValue(executableOption);
 
-            var msix = new MsixService();
-            await msix.GenerateMsixAssetsAsync(sparse, outputDir, name, publisher, description, version, executable);
+            await _msixService.GenerateMsixAssetsAsync(sparse, outputDir, name, publisher, description, version, executable);
 
             Console.WriteLine($"MSIX assets generated at: {outputDir}");
         });

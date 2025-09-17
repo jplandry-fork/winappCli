@@ -6,9 +6,14 @@ namespace Winsdk.Cli.Commands;
 
 internal class MsixCertInstallCommand : Command
 {
+    private readonly CertificateServices _certificateService;
+
     public MsixCertInstallCommand()
         : base("install", "Install a certificate to the local machine store")
     {
+        var configService = new ConfigService(Directory.GetCurrentDirectory());
+        var buildToolsService = new BuildToolsService(configService);
+        _certificateService = new CertificateServices(buildToolsService);
         var certPathArgument = new Argument<string>("cert-path")
         {
             Description = "Path to the certificate file (PFX or CER)"
@@ -36,8 +41,7 @@ internal class MsixCertInstallCommand : Command
             var verbose = parseResult.GetValue(Program.VerboseOption);
             try
             {
-                var certificateService = new CertificateServices();
-                var result = await certificateService.InstallCertificateAsync(certPath, password, force, verbose, ct);
+                var result = await _certificateService.InstallCertificateAsync(certPath, password, force, verbose, ct);
                 if (!result)
                 {
                     Console.WriteLine($"ℹ️ Certificate is already installed");

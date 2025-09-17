@@ -5,9 +5,14 @@ namespace Winsdk.Cli.Commands;
 
 internal class MsixCertGenerateCommand : Command
 {
+    private readonly CertificateServices _certificateService;
+
     public MsixCertGenerateCommand()
         : base("generate", "Generate a new development certificate")
     {
+        var configService = new ConfigService(Directory.GetCurrentDirectory());
+        var buildToolsService = new BuildToolsService(configService);
+        _certificateService = new CertificateServices(buildToolsService);
         var publisherOption = new Option<string>("--publisher")
         {
             Description = "Publisher name for the generated certificate",
@@ -46,9 +51,7 @@ internal class MsixCertGenerateCommand : Command
 
             try
             {
-                var certificateService = new CertificateServices();
-
-                var result = await certificateService.GenerateDevCertificateAsync(publisher, output, password, validDays, verbose, ct);
+                var result = await _certificateService.GenerateDevCertificateAsync(publisher, output, password, validDays, verbose, ct);
 
                 Console.WriteLine("✅ Certificate generated successfully!");
                 Console.WriteLine($"🔐 Certificate: {result.CertificatePath}");

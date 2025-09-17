@@ -76,7 +76,9 @@ internal class SetupCommand : Command
             var arch = parseResult.GetRequiredValue(archOption);
             var verbose = parseResult.GetValue(Program.VerboseOption);
 
-            var winsdkDir = BuildToolsService.FindWinsdkDirectory(baseDirectory);
+            var configService = new ConfigService(configDir);
+            var buildToolsService = new BuildToolsService(configService);
+            var winsdkDir = buildToolsService.FindWinsdkDirectory(baseDirectory);
 
             if (!Directory.Exists(winsdkDir))
             {
@@ -91,10 +93,8 @@ internal class SetupCommand : Command
             Directory.CreateDirectory(includeOut);
             Directory.CreateDirectory(libOut);
             Directory.CreateDirectory(binOut);
-            
-            var config = new ConfigService(configDir);
 
-            Console.WriteLine($"{UiSymbols.Rocket} using config → {config.ConfigPath}");
+            Console.WriteLine($"{UiSymbols.Rocket} using config → {configService.ConfigPath}");
             Console.WriteLine($"{UiSymbols.Rocket} winsdk init starting in {baseDirectory}");
             Console.WriteLine($"{UiSymbols.Folder} Workspace → {winsdkDir}");
 
@@ -103,7 +103,7 @@ internal class SetupCommand : Command
                 Console.WriteLine($"{UiSymbols.Wrench} Experimental/prerelease packages will be included");
             }
 
-            var nuget = new NugetService();
+            var packageService = new PackageInstallationService(configService);
             var cppwinrt = new CppWinrtService();
             var usedVersions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -116,10 +116,10 @@ internal class SetupCommand : Command
             }
 
             Console.WriteLine($"{UiSymbols.Note} Checking for winsdk.yaml...");
-            var hadConfig = config.Exists();
+            var hadConfig = configService.Exists();
             if (hadConfig)
             {
-                pinned = config.Load();
+                pinned = configService.Load();
                 if (!quiet)
                 {
                     Console.WriteLine($"{UiSymbols.Note} Found winsdk.yaml; using pinned versions unless overridden.");
@@ -138,37 +138,22 @@ internal class SetupCommand : Command
                 }
             }
 
-            Console.WriteLine($"{UiSymbols.Wrench} Ensuring nuget.exe is available...");
             if (!quiet)
             {
                 Console.WriteLine($"{UiSymbols.Package} Installing SDK packages → {pkgsDir}");
             }
-            await nuget.EnsureNugetExeAsync(winsdkDir, ct);
 
-            foreach (var pkg in NugetService.SDK_PACKAGES)
-            {
-                string version;
-                if (!ignoreConfig && config.Exists())
-                {
-                    var v = pinned.GetVersion(pkg);
-                    if (string.IsNullOrWhiteSpace(v))
-                    {
-                        version = await nuget.GetLatestVersionAsync(pkg, experimental, ct);
-                    }
-                    else
-                    {
-                        version = v!;
-                    }
-                }
-                else
-                {
-                    version = await nuget.GetLatestVersionAsync(pkg, experimental, ct);
-                }
+            // Initialize workspace
+            packageService.InitializeWorkspace(winsdkDir);
 
-                Console.WriteLine($"  {UiSymbols.Bullet} {pkg} {version}");
-                await nuget.InstallPackageAsync(winsdkDir, pkg, version, pkgsDir, ct);
-                usedVersions[pkg] = version;
-            }
+            // Install all SDK packages
+            usedVersions = await packageService.InstallPackagesAsync(
+                winsdkDir,
+                NugetService.SDK_PACKAGES,
+                includeExperimental: experimental,
+                ignoreConfig: ignoreConfig,
+                quiet: quiet,
+                cancellationToken: ct);
 
             // Prepare consolidated layout and run cppwinrt
             var cppWinrtExe = cppwinrt.FindCppWinrtExe(pkgsDir, usedVersions);
@@ -258,8 +243,8 @@ internal class SetupCommand : Command
             {
                 finalConfig.SetVersion(kvp.Key, kvp.Value);
             }
-            config.Save(finalConfig);
-            Console.WriteLine($"{UiSymbols.Save} Wrote config → {config.ConfigPath}");
+            configService.Save(finalConfig);
+            Console.WriteLine($"{UiSymbols.Save} Wrote config → {configService.ConfigPath}");
 
             // Update .gitignore to exclude .winsdk folder (unless --no-gitignore is specified)
             if (!noGitignore)

@@ -5,8 +5,13 @@ namespace Winsdk.Cli.Commands;
 
 internal class MsixSignCommand : Command
 {
+    private readonly CertificateServices _certificateService;
+
     public MsixSignCommand() : base("sign", "Sign an MSIX package with a certificate")
     {
+        var configService = new ConfigService(Directory.GetCurrentDirectory());
+        var buildToolsService = new BuildToolsService(configService);
+        _certificateService = new CertificateServices(buildToolsService);
         var msixPathArgument = new Argument<string>("msix-path")
         {
             Description = "Path to the MSIX package to sign"
@@ -39,10 +44,9 @@ internal class MsixSignCommand : Command
             var timestamp = parseResult.GetValue(timestampOption);
             var verbose = parseResult.GetValue(Program.VerboseOption);
 
-            var certificateService = new CertificateServices();
             try
             {
-                await certificateService.SignMsixPackageAsync(msixPath, certPath, password, timestamp, verbose, ct);
+                await _certificateService.SignMsixPackageAsync(msixPath, certPath, password, timestamp, verbose, ct);
 
                 Console.WriteLine($"🔐 Signed package: {msixPath}");
                 return 0;

@@ -4,6 +4,12 @@ namespace Winsdk.Cli.Services;
 
 internal class CertificateServices
 {
+    private readonly BuildToolsService _buildToolsService;
+
+    public CertificateServices(BuildToolsService buildToolsService)
+    {
+        _buildToolsService = buildToolsService;
+    }
     public record CertificateResult(
         string CertificatePath,
         string Password,
@@ -226,7 +232,7 @@ internal class CertificateServices
 
         try
         {
-            await BuildToolsService.RunBuildToolAsync("signtool.exe", arguments, verbose, cancellationToken: cancellationToken);
+            await _buildToolsService.RunBuildToolAsync("signtool.exe", arguments, verbose, cancellationToken: cancellationToken);
 
             if (verbose)
             {
