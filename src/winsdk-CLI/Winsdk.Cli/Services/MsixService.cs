@@ -495,7 +495,7 @@ internal class MsixService
                 }
 
                 // Sign the package
-                await certificateService.SignMsixPackageAsync(outputMsixPath, certPath, certificatePassword, verbose: verbose, cancellationToken: cancellationToken);
+                await certificateService.SignFileAsync(outputMsixPath, certPath, certificatePassword, verbose: verbose, cancellationToken: cancellationToken);
             }
 
             // Clean up temporary PRI files

@@ -3,18 +3,18 @@ using Winsdk.Cli.Services;
 
 namespace Winsdk.Cli.Commands;
 
-internal class MsixSignCommand : Command
+internal class SignCommand : Command
 {
     private readonly CertificateServices _certificateService;
 
-    public MsixSignCommand() : base("sign", "Sign an MSIX package with a certificate")
+    public SignCommand() : base("sign", "Sign a file/package with a certificate")
     {
         var configService = new ConfigService(Directory.GetCurrentDirectory());
         var buildToolsService = new BuildToolsService(configService);
         _certificateService = new CertificateServices(buildToolsService);
-        var msixPathArgument = new Argument<string>("msix-path")
+        var filePathArgument = new Argument<string>("file-path")
         {
-            Description = "Path to the MSIX package to sign"
+            Description = "Path to the file/package to sign"
         };
         var certPathArgument = new Argument<string>("cert-path")
         {
@@ -30,7 +30,7 @@ internal class MsixSignCommand : Command
             Description = "Timestamp server URL"
         };
 
-        Arguments.Add(msixPathArgument);
+        Arguments.Add(filePathArgument);
         Arguments.Add(certPathArgument);
         Options.Add(passwordOption);
         Options.Add(timestampOption);
@@ -38,7 +38,7 @@ internal class MsixSignCommand : Command
 
         SetAction(async (parseResult, ct) =>
         {
-            var msixPath = parseResult.GetRequiredValue(msixPathArgument);
+            var filePath = parseResult.GetRequiredValue(filePathArgument);
             var certPath = parseResult.GetRequiredValue(certPathArgument);
             var password = parseResult.GetValue(passwordOption);
             var timestamp = parseResult.GetValue(timestampOption);
@@ -46,14 +46,14 @@ internal class MsixSignCommand : Command
 
             try
             {
-                await _certificateService.SignMsixPackageAsync(msixPath, certPath, password, timestamp, verbose, ct);
+                await _certificateService.SignFileAsync(filePath, certPath, password, timestamp, verbose, ct);
 
-                Console.WriteLine($"🔐 Signed package: {msixPath}");
+                Console.WriteLine($"🔐 Signed file: {filePath}");
                 return 0;
             }
             catch (Exception error)
             {
-                Console.Error.WriteLine($"❌ Failed to sign MSIX package: {error.Message}");
+                Console.Error.WriteLine($"❌ Failed to sign file: {error.Message}");
                 return 1;
             }
         });

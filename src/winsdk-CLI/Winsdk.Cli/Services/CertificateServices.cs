@@ -200,18 +200,19 @@ internal class CertificateServices
     }
 
     /// <summary>
-    /// Signs an MSIX package with a certificate
+    /// Signs a file with a certificate.
+    /// This method can be used to sign any file, including but not limited to MSIX packages.
     /// </summary>
-    /// <param name="msixPath">Path to the MSIX package to sign</param>
+    /// <param name="filePath">Path to the file to sign</param>
     /// <param name="certificatePath">Path to the .pfx certificate file</param>
     /// <param name="password">Certificate password</param>
     /// <param name="timestampUrl">Timestamp server URL (optional)</param>
     /// <param name="verbose">Enable verbose logging</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    public async Task SignMsixPackageAsync(string msixPath, string certificatePath, string? password = "password", string? timestampUrl = null, bool verbose = true, CancellationToken cancellationToken = default)
+    public async Task SignFileAsync(string filePath, string certificatePath, string? password = "password", string? timestampUrl = null, bool verbose = true, CancellationToken cancellationToken = default)
     {
-        if (!File.Exists(msixPath))
-            throw new FileNotFoundException($"MSIX package not found: {msixPath}");
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException($"File not found: {filePath}");
 
         if (!File.Exists(certificatePath))
             throw new FileNotFoundException($"Certificate file not found: {certificatePath}");
@@ -223,11 +224,11 @@ internal class CertificateServices
             arguments += $@" /tr ""{timestampUrl}"" /td SHA256";
         }
 
-        arguments += $@" ""{msixPath}""";
+        arguments += $@" ""{filePath}""";
 
         if (verbose)
         {
-            Console.WriteLine($"Signing MSIX package: {msixPath}");
+            Console.WriteLine($"Signing file: {filePath}");
         }
 
         try
@@ -236,12 +237,12 @@ internal class CertificateServices
 
             if (verbose)
             {
-                Console.WriteLine("MSIX package signed successfully");
+                Console.WriteLine("File signed successfully");
             }
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException($"Failed to sign MSIX package: {ex.Message}", ex);
+            throw new InvalidOperationException($"Failed to sign file: {ex.Message}", ex);
         }
     }
 }

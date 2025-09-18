@@ -29,6 +29,7 @@ internal static class Program
             new SetupCommand(),
             new MsixCommand(),
             new CertCommand(),
+            new SignCommand(),
             new ToolCommand()
         };
 
