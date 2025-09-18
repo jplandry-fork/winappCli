@@ -1,5 +1,4 @@
-﻿using System;
-using System.CommandLine;
+﻿using System.CommandLine;
 using Winsdk.Cli.Services;
 
 namespace Winsdk.Cli.Commands;

@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace Winsdk.Cli.Services;
 
 internal sealed class PackageInstallationService

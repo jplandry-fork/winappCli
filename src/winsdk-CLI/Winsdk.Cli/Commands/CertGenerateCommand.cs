@@ -41,12 +41,18 @@ internal class CertGenerateCommand : Command
             Description = "Number of days the certificate is valid",
             DefaultValueFactory = (argumentResult) => 365,
         };
+        var installOption = new Option<bool>("--install")
+        {
+            Description = "Install the certificate to the local machine store after generation",
+            DefaultValueFactory = (argumentResult) => false,
+        };
 
         Options.Add(publisherOption);
         Options.Add(manifestOption);
         Options.Add(outputOption);
         Options.Add(passwordOption);
         Options.Add(validDaysOption);
+        Options.Add(installOption);
         Options.Add(Program.VerboseOption);
 
         SetAction(async (parseResult, ct) =>
@@ -56,10 +62,19 @@ internal class CertGenerateCommand : Command
             var output = parseResult.GetRequiredValue(outputOption);
             var password = parseResult.GetRequiredValue(passwordOption);
             var validDays = parseResult.GetRequiredValue(validDaysOption);
+            var install = parseResult.GetRequiredValue(installOption);
             var verbose = parseResult.GetValue(Program.VerboseOption);
 
             try
             {
+                // Check if certificate file already exists
+                if (File.Exists(output))
+                {
+                    Console.Error.WriteLine($"❌ Certificate file already exists: {output}");
+                    Console.Error.WriteLine("Please specify a different output path or remove the existing file.");
+                    return 1;
+                }
+
                 // Infer publisher using the hierarchy specified
                 var finalPublisher = await InferPublisherAsync(publisher, manifestPath, verbose, ct);
                 
@@ -67,6 +82,31 @@ internal class CertGenerateCommand : Command
 
                 Console.WriteLine("✅ Certificate generated successfully!");
                 Console.WriteLine($"🔐 Certificate: {result.CertificatePath}");
+
+                // Add certificate to .gitignore
+                var certFileName = Path.GetFileName(result.CertificatePath);
+                var projectDirectory = Directory.GetCurrentDirectory();
+                GitignoreService.AddCertificateToGitignore(projectDirectory, certFileName, verbose);
+
+                // Install certificate if requested
+                if (install)
+                {
+                    if (verbose)
+                    {
+                        Console.WriteLine("Installing certificate...");
+                    }
+                    
+                    var installResult = await _certificateService.InstallCertificateAsync(result.CertificatePath, password, false, verbose, ct);
+                    if (installResult)
+                    {
+                        Console.WriteLine("✅ Certificate installed successfully!");
+                    }
+                    else
+                    {
+                        Console.WriteLine("ℹ️ Certificate was already installed");
+                    }
+                }
+
                 return 0;
             }
             catch (Exception error)
