@@ -32,7 +32,7 @@ internal static class Program
             new ManifestCommand(),
             new UpdateCommand(),
             new CreateDebugIdentityCommand(),
-            new GetGlobalWinsdkCommand(),
+            new GetWinsdkPathCommand(),
             new CertCommand(),
             new SignCommand(),
             new ToolCommand()

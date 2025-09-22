@@ -47,7 +47,7 @@
     "buildtools-utils.js",
     "msix-utils.js",
     "winsdk-cli-utils.js",
-    "global-winsdk-utils.js",
+    "winsdk-path-utils.js",
     "addon-utils.js",
     "addon-template/",
     "utils.js",

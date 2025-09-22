@@ -3,8 +3,6 @@ packages:
     version: 2.0.250303.1
   - name: Microsoft.Windows.SDK.BuildTools
     version: 10.0.26100.4948
-  - name: Microsoft.Web.WebView2
-    version: 1.0.3485.44
   - name: Microsoft.WindowsAppSDK
     version: 1.8.250907003
   - name: Microsoft.UI.Xaml

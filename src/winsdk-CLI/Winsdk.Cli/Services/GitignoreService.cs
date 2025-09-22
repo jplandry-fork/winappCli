@@ -3,7 +3,7 @@ namespace Winsdk.Cli.Services;
 internal static class GitignoreService
 {
     /// <summary>
-    /// Update .gitignore to exclude .winsdk/debug folder
+    /// Update .gitignore to exclude .winsdk folder
     /// </summary>
     /// <param name="projectDirectory">Directory containing the project</param>
     /// <param name="verbose">Whether to log progress messages</param>
@@ -23,7 +23,7 @@ internal static class GitignoreService
             }
 
             // Check if .winsdk is already in .gitignore
-            var winsdkEntry = ".winsdk/debug";
+            var winsdkEntry = ".winsdk";
             var lines = gitignoreContent.Split('\n');
             var hasWinsdkEntry = lines.Any(line => line.Trim() == winsdkEntry.Trim());
 
@@ -47,7 +47,7 @@ internal static class GitignoreService
 
                 if (verbose)
                 {
-                    Console.WriteLine($"{UiSymbols.Check} Added .winsdk/debug to .gitignore");
+                    Console.WriteLine($"{UiSymbols.Check} Added .winsdk to .gitignore");
                     Console.WriteLine($"{UiSymbols.Note} Note: winsdk.yaml should be committed to track SDK versions");
                 }
 
@@ -55,7 +55,7 @@ internal static class GitignoreService
             }
             else if (verbose)
             {
-                Console.WriteLine($"{UiSymbols.Skip} .winsdk/debug already exists in .gitignore");
+                Console.WriteLine($"{UiSymbols.Skip} .winsdk already exists in .gitignore");
             }
 
             if (verbose)

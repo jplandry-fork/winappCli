@@ -22,20 +22,19 @@ internal class PackageCommand : Command
                 var projectManifest = MsixService.FindProjectManifest();
                 if (projectManifest != null)
                 {
-                    return Path.GetDirectoryName(projectManifest)!; // Return .winsdk directory
+                    return Path.GetDirectoryName(projectManifest)!; // Return manifest directory
                 }
                 return Directory.GetCurrentDirectory(); // Fallback to current directory
             }
         };
-        var outputFolderArgument = new Argument<string>("output-folder")
+        var outputFolderOption = new Option<string>("--output-folder")
         {
             Description = "Output folder for the generated package",
-            Arity = ArgumentArity.ZeroOrOne,
             DefaultValueFactory = (argumentResult) => Directory.GetCurrentDirectory()
         };
 
         Arguments.Add(inputFolderArgument);
-        Arguments.Add(outputFolderArgument);
+        Options.Add(outputFolderOption);
 
         var nameOption = new Option<string?>("--name")
         {
@@ -87,7 +86,7 @@ internal class PackageCommand : Command
                               (MsixService.FindProjectManifest() != null ? 
                                Path.GetDirectoryName(MsixService.FindProjectManifest()!)! : 
                                Directory.GetCurrentDirectory());
-            var outputFolder = parseResult.GetRequiredValue(outputFolderArgument);
+            var outputFolder = parseResult.GetRequiredValue(outputFolderOption);
             var name = parseResult.GetValue(nameOption);
             var skipPri = parseResult.GetValue(skipPriOption);
             var certPath = parseResult.GetValue(certOption);

@@ -80,7 +80,7 @@ internal class InitCommand : Command
 
             var options = new WorkspaceSetupOptions
             {
-                BaseDirectory = baseDirectory ?? Environment.CurrentDirectory,
+                BaseDirectory = baseDirectory ?? Directory.GetCurrentDirectory(),
                 ConfigDir = configDir,
                 Quiet = quiet,
                 Verbose = verbose,

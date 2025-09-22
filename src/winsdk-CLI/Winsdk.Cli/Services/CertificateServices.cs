@@ -12,6 +12,19 @@ internal class CertificateServices
         _buildToolsService = buildToolsService;
         _powerShellService = new PowerShellService();
     }
+
+    /// <summary>
+    /// Gets the default environment variables for certificate operations to prevent PowerShell Core conflicts
+    /// </summary>
+    /// <returns>Dictionary with PSModulePath cleared</returns>
+    private static Dictionary<string, string> GetCertificateEnvironmentVariables()
+    {
+        return new Dictionary<string, string>
+        {
+            ["PSModulePath"] = "" // Clear to prevent PowerShell Core module conflicts
+        };
+    }
+
     public record CertificateResult(
         string CertificatePath,
         string Password,
@@ -55,7 +68,7 @@ internal class CertificateServices
 
         try
         {
-            var (exitCode, _) = await _powerShellService.RunCommandAsync(command, verbose: verbose, cancellationToken: cancellationToken);
+            var (exitCode, _) = await _powerShellService.RunCommandAsync(command, verbose: verbose, environmentVariables: GetCertificateEnvironmentVariables(), cancellationToken: cancellationToken);
 
             if (exitCode != 0)
             {
@@ -107,7 +120,7 @@ internal class CertificateServices
 
                 try
                 {
-                    var (_, result) = await _powerShellService.RunCommandAsync(checkCommand, verbose: false, cancellationToken: cancellationToken);
+                    var (_, result) = await _powerShellService.RunCommandAsync(checkCommand, verbose: false, environmentVariables: GetCertificateEnvironmentVariables(), cancellationToken: cancellationToken);
 
                     if (!string.IsNullOrWhiteSpace(result))
                     {
@@ -129,7 +142,7 @@ internal class CertificateServices
             var absoluteCertPath = Path.GetFullPath(certPath);
             var installCommand = $"Import-PfxCertificate -FilePath '{absoluteCertPath}' -CertStoreLocation 'Cert:\\LocalMachine\\TrustedPeople' -Password (ConvertTo-SecureString -String '{password}' -Force -AsPlainText)";
 
-            await _powerShellService.RunCommandAsync(installCommand, elevated: true, verbose: verbose, cancellationToken: cancellationToken);
+            await _powerShellService.RunCommandAsync(installCommand, elevated: true, environmentVariables: GetCertificateEnvironmentVariables(), verbose: verbose, cancellationToken: cancellationToken);
 
             if (verbose)
             {

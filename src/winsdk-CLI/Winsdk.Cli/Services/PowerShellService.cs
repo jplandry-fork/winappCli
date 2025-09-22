@@ -12,13 +12,15 @@ internal class PowerShellService
     /// </summary>
     /// <param name="command">The PowerShell command to run</param>
     /// <param name="elevated">Whether to run with elevated privileges (UAC prompt)</param>
+    /// <param name="environmentVariables">Optional dictionary of environment variables to set/override</param>
     /// <param name="verbose">Enable verbose logging</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Tuple containing (exitCode, stdout)</returns>
     public async Task<(int exitCode, string output)> RunCommandAsync(
-        string command, 
-        bool elevated = false, 
-        bool verbose = false, 
+        string command,
+        bool elevated = false,
+        Dictionary<string, string>? environmentVariables = null,
+        bool verbose = false,
         CancellationToken cancellationToken = default)
     {
         if (verbose)
@@ -40,6 +42,22 @@ internal class PowerShellService
             RedirectStandardError = !elevated,
             CreateNoWindow = !elevated
         };
+        
+        // Apply custom environment variables if provided
+        if (environmentVariables != null)
+        {
+            foreach (var kvp in environmentVariables)
+            {
+                psi.Environment[kvp.Key] = kvp.Value;
+            }
+        }
+        
+        // Always clear PSModulePath to prevent PowerShell Core module conflicts when calling Windows PowerShell
+        // This fixes the issue where calling powershell.exe from PowerShell Core causes module loading errors
+        if (!psi.Environment.ContainsKey("PSModulePath"))
+        {
+            psi.Environment["PSModulePath"] = "";
+        }
 
         if (elevated)
         {

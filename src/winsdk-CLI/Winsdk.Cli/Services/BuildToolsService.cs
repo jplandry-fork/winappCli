@@ -34,46 +34,46 @@ internal class BuildToolsService
         };
     }
 
-    private string GetDefaultWinsdkDirectory()
+    public static string GetGlobalWinsdkDirectory()
     {
         var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var winsdkDir = Path.Combine(userProfile, ".winsdk");
         return winsdkDir;
     }
 
-    public string FindWinsdkDirectory(string? baseDirectoryStr = null)
+    public string GetLocalWinsdkDirectory(string? baseDirectoryStr = null)
     {
-        if (!string.IsNullOrEmpty(baseDirectoryStr))
+        if (string.IsNullOrEmpty(baseDirectoryStr))
         {
-            var originalBaseDir = new DirectoryInfo(baseDirectoryStr);
-            var baseDirectory = originalBaseDir;
-            while (baseDirectory != null)
-            {
-                var winsdkDirectory = Path.Combine(baseDirectory.FullName, ".winsdk");
-                if (Directory.Exists(winsdkDirectory))
-                {
-                    return winsdkDirectory;
-                }
-                baseDirectory = baseDirectory.Parent;
-            }
-
-            return Path.Combine(originalBaseDir.FullName, ".winsdk");
+            baseDirectoryStr = Directory.GetCurrentDirectory();
         }
 
-        return GetDefaultWinsdkDirectory();
+        var originalBaseDir = new DirectoryInfo(baseDirectoryStr);
+        var baseDirectory = originalBaseDir;
+        while (baseDirectory != null)
+        {
+            var winsdkDirectory = Path.Combine(baseDirectory.FullName, ".winsdk");
+            if (Directory.Exists(winsdkDirectory))
+            {
+                return winsdkDirectory;
+            }
+            baseDirectory = baseDirectory.Parent;
+        }
+
+        return Path.Combine(originalBaseDir.FullName, ".winsdk");
     }
 
     /// <summary>
     /// Find a path within any package structure (generic version)
     /// </summary>
-    /// <param name="winsdkDir">The .winsdk directory</param>
     /// <param name="packageName">The package name (e.g., BUILD_TOOLS_PACKAGE or CPP_SDK_PACKAGE)</param>
     /// <param name="subPath">The subdirectory within the package (e.g., "bin", "schemas", "c")</param>
     /// <param name="finalSubPath">Optional final subdirectory (e.g., "winrt" for schemas, "Include" for SDK)</param>
     /// <param name="requireArchitecture">Whether to append architecture directory for bin paths</param>
     /// <returns>Full path to the requested location, or null if not found</returns>
-    private string? FindPackagePath(string winsdkDir, string packageName, string subPath, string? finalSubPath = null, bool requireArchitecture = false)
+    private string? FindPackagePath(string packageName, string subPath, string? finalSubPath = null, bool requireArchitecture = false)
     {
+        var winsdkDir = GetGlobalWinsdkDirectory();
         var packagesDir = Path.Combine(winsdkDir, "packages");
         if (!Directory.Exists(packagesDir))
             return null;
@@ -174,9 +174,9 @@ internal class BuildToolsService
         }
     }
 
-    private string? FindBuildToolsBinPath(string winsdkDir)
+    private string? FindBuildToolsBinPath()
     {
-        return FindPackagePath(winsdkDir, BUILD_TOOLS_PACKAGE, "bin", requireArchitecture: true);
+        return FindPackagePath(BUILD_TOOLS_PACKAGE, "bin", requireArchitecture: true);
     }
 
     private Version ExtractVersion(string packageFolderName)
@@ -200,34 +200,30 @@ internal class BuildToolsService
     /// <summary>
     /// Get the path to the schemas directory in BuildTools
     /// </summary>
-    /// <param name="baseDirectory">Starting directory to search for .winsdk (defaults to user profile directory)</param>
     /// <returns>Path to the schemas directory if found, null otherwise</returns>
-    public string? GetSchemasPath(string? baseDirectory = null)
+    public string? GetSchemasPath()
     {
-        var winsdkDir = FindWinsdkDirectory(baseDirectory);
-        return FindPackagePath(winsdkDir, BUILD_TOOLS_PACKAGE, "schemas", "winrt");
+        return FindPackagePath(BUILD_TOOLS_PACKAGE, "schemas", "winrt");
     }
 
     // get Microsoft.Windows.SDK.CPP.10.0.26100.4948\c\Include\10.0.26100.0\winrt path
-    public string? GetCppSDKIncludesPath(string? baseDirectory = null)
+    public string? GetCppSDKIncludesPath()
     {
-        var winsdkDir = FindWinsdkDirectory(baseDirectory);
-        return FindPackagePath(winsdkDir, CPP_SDK_PACKAGE, Path.Join("c", "Include"));
+        return FindPackagePath(CPP_SDK_PACKAGE, Path.Join("c", "Include"));
     }
 
     /// <summary>
     /// Get the full path to a specific BuildTools executable
     /// </summary>
     /// <param name="toolName">Name of the tool (e.g., 'mt.exe', 'signtool.exe')</param>
-    /// <param name="baseDirectory">Starting directory to search for .winsdk (defaults to user profile directory)</param>
     /// <returns>Full path to the executable</returns>
-    public string? GetBuildToolPath(string toolName, string? baseDirectory = null)
+    public string? GetBuildToolPath(string toolName)
     {
-        var winsdkDir = FindWinsdkDirectory(baseDirectory);
+        var winsdkDir = GetGlobalWinsdkDirectory();
         if (winsdkDir == null)
             return null;
 
-        var binPath = FindBuildToolsBinPath(winsdkDir);
+        var binPath = FindBuildToolsBinPath();
         if (binPath == null)
             return null;
 
@@ -238,17 +234,14 @@ internal class BuildToolsService
     /// <summary>
     /// Ensure BuildTools package is installed, downloading it if necessary
     /// </summary>
-    /// <param name="baseDirectory">Starting directory to search for .winsdk (defaults to user profile directory)</param>
     /// <param name="quiet">Suppress progress messages</param>
     /// <param name="forceLatest">Force installation of the latest version, even if a version is already installed</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Path to BuildTools bin directory if successful, null otherwise</returns>
-    public async Task<string?> EnsureBuildToolsAsync(string? baseDirectory = null, bool quiet = false, bool forceLatest = false, CancellationToken cancellationToken = default)
+    public async Task<string?> EnsureBuildToolsAsync(bool quiet = false, bool forceLatest = false, CancellationToken cancellationToken = default)
     {
-        var winsdkDir = FindWinsdkDirectory(baseDirectory);
-
         // Check if BuildTools are already installed (unless forcing latest)
-        var existingBinPath = FindBuildToolsBinPath(winsdkDir);
+        var existingBinPath = FindBuildToolsBinPath();
         if (existingBinPath != null && !forceLatest)
         {
             return existingBinPath;
@@ -270,12 +263,14 @@ internal class BuildToolsService
             Console.WriteLine($"{UiSymbols.Wrench} {actionMessage} {BUILD_TOOLS_PACKAGE}{versionInfo}...");
         }
 
+        var winsdkDir = GetGlobalWinsdkDirectory();
+
         var success = await _packageService.EnsurePackageAsync(
-            winsdkDir, 
-            BUILD_TOOLS_PACKAGE, 
-            version: pinnedVersion, 
-            includeExperimental: false, 
-            quiet: quiet, 
+            winsdkDir,
+            BUILD_TOOLS_PACKAGE,
+            version: pinnedVersion,
+            includeExperimental: false,
+            quiet: quiet,
             cancellationToken: cancellationToken);
 
         if (!success)
@@ -284,7 +279,7 @@ internal class BuildToolsService
         }
 
         // Verify installation and return bin path
-        var binPath = FindBuildToolsBinPath(winsdkDir);
+        var binPath = FindBuildToolsBinPath();
         if (binPath != null && !quiet)
         {
             Console.WriteLine($"{UiSymbols.Check} BuildTools installed successfully → {binPath}");
@@ -299,13 +294,13 @@ internal class BuildToolsService
     /// <param name="toolName">Name of the tool (e.g., 'mt.exe', 'signtool.exe')</param>
     /// <param name="arguments">Arguments to pass to the tool</param>
     /// <param name="verbose">Whether to output verbose information</param>
-    /// <param name="baseDirectory">Starting directory to search for .winsdk (defaults to user profile directory)</param>
-    /// <returns>Task representing the asynchronous operation</returns>
-    public async Task RunBuildToolAsync(string toolName, string arguments, bool verbose = false, string? baseDirectory = null, CancellationToken cancellationToken = default)
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Tuple containing (stdout, stderr)</returns>
+    public async Task<(string stdout, string stderr)> RunBuildToolAsync(string toolName, string arguments, bool verbose = false, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var toolPath = GetBuildToolPath(toolName, baseDirectory);
+        var toolPath = GetBuildToolPath(toolName);
         if (toolPath == null)
         {
             throw new FileNotFoundException($"Could not find {toolName}. Make sure the Microsoft.Windows.SDK.BuildTools package is installed in a .winsdk directory.");
@@ -338,5 +333,7 @@ internal class BuildToolsService
         {
             throw new InvalidOperationException($"{toolName} execution failed with exit code {p.ExitCode}");
         }
+
+        return (stdout, stderr);
     }
 }

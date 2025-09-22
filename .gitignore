@@ -186,7 +186,7 @@ launchSettings.json
 build/
 
 # Ignore local winsdk workspace and per-project publish outputs
-.winsdk/debug
+.winsdk
 src/**/bin/**/publish/
 
 # Ignore local portfile-cli-test outputs except for CMakeLists.txt

@@ -7,13 +7,15 @@
     "start": "electron .",
     "build": "electron-builder --dir",
     "package-msi": "electron-builder",
-    "create-msix-sparse": "winsdk tool makeappx.exe pack /o /d \"./msix-sparse-assets\" /nv /p \"./dist/SparseExample.msix\"",
+    "create-msix": "winsdk package ./dist/win-unpacked/ --output-folder ./dist",
     "build-addon": "node-gyp clean configure build --directory=native",
-    "copy-msix-assets": "powershell -Command \"if (Test-Path 'msix-full') { Copy-Item -Path 'msix-full\\*' -Destination 'dist\\win-unpacked' -Recurse -Force; Write-Host 'Copied msix-full contents to dist\\win-unpacked' } else { Write-Host 'msix-full folder not found' }\"",
-    "generate-dev-cert": "winsdk cert generate --publisher \"CN=Metulev\" --output .\\dev-cert.pfx",
-    "create-msix-package": "winsdk package dist\\win-unpacked dist --install-cert --cert .\\dev-cert.pfx"
+    "generate-dev-cert": "winsdk cert generate --publisher \"CN=Metulev\" --output .\\dev-cert.pfx"
   },
   "build": {
+    "extraFiles": [
+      "appxmanifest.xml",
+      "Assets/"
+    ],
     "win": {
       "target": "msi",
       "icon": "assets/icon.png"
@@ -45,9 +47,11 @@
     "@electron/rebuild": "^4.0.1",
     "windows-sdk": "file:../src/winsdk-npm"
   },
-  "overrides": {
-      "app-builder-lib": {
-        "@electron/rebuild": "4.0.1"
-      }
+  "//": {
+    "overrides": {
+        "app-builder-lib": {
+          "@electron/rebuild": "4.0.1"
+        }
+    }
   }
 }

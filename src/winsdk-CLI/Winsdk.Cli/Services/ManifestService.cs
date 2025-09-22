@@ -61,11 +61,9 @@ internal class ManifestService
 
         packageName = CleanPackageName(packageName);
 
-        var winsdkDir = Path.Combine(directory, ".winsdk");
-
         // Generate complete manifest using shared service
         await ManifestTemplateService.GenerateCompleteManifestAsync(
-            winsdkDir,
+            directory,
             packageName,
             publisherName,
             version,
@@ -78,7 +76,7 @@ internal class ManifestService
         // If logo path is provided, copy it as additional asset
         if (!string.IsNullOrEmpty(logoPath) && File.Exists(logoPath))
         {
-            await CopyLogoAsAdditionalAssetAsync(winsdkDir, logoPath, verbose, cancellationToken);
+            await CopyLogoAsAdditionalAssetAsync(directory, logoPath, verbose, cancellationToken);
         }
     }
 

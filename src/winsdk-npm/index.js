@@ -1,7 +1,7 @@
 // Main entry point for the Windows SDK BuildTools package
 const buildtoolsUtils = require('./buildtools-utils');
 const msixUtils = require('./msix-utils');
-const globalWinsdkUtils = require('./global-winsdk-utils');
+const winsdkPathUtils = require('./winsdk-path-utils');
 
 module.exports = {
   // BuildTools utilities
@@ -11,6 +11,7 @@ module.exports = {
   addMsixIdentityToExe: msixUtils.addMsixIdentityToExe,
   addElectronDebugIdentity: msixUtils.addElectronDebugIdentity,
 
-  // Global winsdk directory utilities
-  getGlobalWinsdkPath: globalWinsdkUtils.getGlobalWinsdkPath
+  // Winsdk directory utilities
+  getGlobalWinsdkPath: winsdkPathUtils.getGlobalWinsdkPath,
+  getLocalWinsdkPath: winsdkPathUtils.getLocalWinsdkPath
 };

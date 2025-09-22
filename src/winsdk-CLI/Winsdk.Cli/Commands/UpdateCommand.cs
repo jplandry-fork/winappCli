@@ -27,7 +27,7 @@ internal class UpdateCommand : Command
                 var packageService = new PackageInstallationService(configService);
                 var nugetService = new NugetService();
 
-                var winsdkDir = buildToolsService.FindWinsdkDirectory();
+                var winsdkDir = BuildToolsService.GetGlobalWinsdkDirectory();
 
                 // Step 1: Find yaml config file
                 if (verbose)

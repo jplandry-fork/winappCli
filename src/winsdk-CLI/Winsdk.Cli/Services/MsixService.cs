@@ -266,8 +266,8 @@ internal class MsixService
     /// <param name="outputPath">Output path for PRI file (default: packageDir/resources.pri)</param>
     /// <param name="verbose">Enable verbose logging</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Path to the generated PRI file</returns>
-    public async Task<string> GeneratePriFileAsync(string packageDir, string? configPath = null, string? outputPath = null, bool verbose = true, CancellationToken cancellationToken = default)
+    /// <returns>List of resource files that were processed</returns>
+    public async Task<List<string>> GeneratePriFileAsync(string packageDir, string? configPath = null, string? outputPath = null, bool verbose = true, CancellationToken cancellationToken = default)
     {
         // Remove trailing backslashes from packageDir
         packageDir = packageDir.TrimEnd('\\', '/');
@@ -290,14 +290,35 @@ internal class MsixService
 
         try
         {
-            await _buildToolsService.RunBuildToolAsync("makepri.exe", arguments, verbose, cancellationToken: cancellationToken);
+            var (stdout, stderr) = await _buildToolsService.RunBuildToolAsync("makepri.exe", arguments, verbose, cancellationToken: cancellationToken);
+
+            // Parse the output to extract resource files
+            var resourceFiles = new List<string>();
+            var lines = stdout.Replace("\0", "").Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+            
+            foreach (var line in lines)
+            {
+                // Look for lines that match the pattern "Resource File: *"
+                if (line.StartsWith("Resource File: ", StringComparison.OrdinalIgnoreCase))
+                {
+                    var fileName = line.Substring("Resource File: ".Length).Trim();
+                    if (!string.IsNullOrEmpty(fileName))
+                    {
+                        resourceFiles.Add(Path.Combine(packageDir, fileName));
+                    }
+                }
+            }
 
             if (verbose)
             {
                 Console.WriteLine($"PRI file generated: {priOutputPath}");
+                if (resourceFiles.Count > 0)
+                {
+                    Console.WriteLine($"Processed {resourceFiles.Count} resource files");
+                }
             }
 
-            return priOutputPath;
+            return resourceFiles;
         }
         catch (Exception ex)
         {
@@ -435,6 +456,7 @@ internal class MsixService
 
         try
         {
+            List<string> tempFiles = [];
             // Generate PRI files if not skipped
             if (!skipPri)
             {
@@ -443,8 +465,18 @@ internal class MsixService
                     Console.WriteLine("Generating PRI configuration and files...");
                 }
 
-                await CreatePriConfigAsync(inputFolder, verbose: verbose, cancellationToken: cancellationToken);
-                await GeneratePriFileAsync(inputFolder, verbose: verbose, cancellationToken: cancellationToken);
+                string priConfigFilePath = await CreatePriConfigAsync(inputFolder, verbose: verbose, cancellationToken: cancellationToken);
+                tempFiles.Add(priConfigFilePath);
+                var resourceFiles = await GeneratePriFileAsync(inputFolder, verbose: verbose, cancellationToken: cancellationToken);
+                tempFiles.AddRange(resourceFiles);
+                if (verbose && resourceFiles.Count > 0)
+                {
+                    Console.WriteLine($"Resource files included in PRI:");
+                    foreach (var resourceFile in resourceFiles)
+                    {
+                        Console.WriteLine($"  - {resourceFile}");
+                    }
+                }
             }
 
             await CreateMsixPackageFromFolderAsync(inputFolder, verbose, outputMsixPath, cancellationToken);
@@ -459,12 +491,6 @@ internal class MsixService
             // Clean up temporary PRI files
             if (!skipPri)
             {
-                var tempFiles = new[]
-                {
-                    Path.Combine(inputFolder, "priconfig.xml"),
-                    Path.Combine(inputFolder, "resources.pri")
-                };
-
                 foreach (var file in tempFiles)
                 {
                     try
@@ -576,7 +602,7 @@ internal class MsixService
 
         while (directory != null)
         {
-            var manifestPath = Path.Combine(directory.FullName, ".winsdk", "appxmanifest.xml");
+            var manifestPath = Path.Combine(directory.FullName, "appxmanifest.xml");
             if (File.Exists(manifestPath))
             {
                 return manifestPath;
