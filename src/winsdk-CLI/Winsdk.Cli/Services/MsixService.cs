@@ -870,7 +870,7 @@ $1",
             {
                 if (verbose)
                 {
-                    Console.WriteLine($"⏭️  Skipping manifest file: {fileName}");
+                    Console.WriteLine($"⏭️  Skipping manifest file: {file}");
                 }
                 continue;
             }
@@ -882,12 +882,6 @@ $1",
             
             File.Copy(file, targetFile, overwrite: true);
             filesCopied++;
-            
-            if (verbose)
-            {
-                var relativePath = Path.GetRelativePath(sourceDir, file);
-                Console.WriteLine($"📁 Copied: {relativePath}");
-            }
         }
 
         // Get all subdirectories and copy them recursively
@@ -897,13 +891,13 @@ $1",
         {
             var dirName = Path.GetFileName(directory);
             
-            // Skip debug directories to avoid copying existing debug folders
-            if (dirName.Equals("debug", StringComparison.OrdinalIgnoreCase) || 
-                dirName.Contains("debug", StringComparison.OrdinalIgnoreCase))
+            // Skip .winsdk directories to avoid copying existing .winsdk folders
+            if (dirName.Equals(".winsdk", StringComparison.OrdinalIgnoreCase) || 
+                dirName.Contains(".winsdk", StringComparison.OrdinalIgnoreCase))
             {
                 if (verbose)
                 {
-                    Console.WriteLine($"⏭️  Skipping debug directory: {dirName}");
+                    Console.WriteLine($"⏭️  Skipping .winsdk directory: {directory}");
                 }
                 continue;
             }

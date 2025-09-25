@@ -309,11 +309,6 @@ async function handleAddonElectronDebugIdentity(args) {
     });
 
     console.log(`✅ Electron debug identity setup completed successfully!`);
-    console.log(`📦 Package: ${result.packageName}`);
-    console.log(`👤 Publisher: ${result.publisher}`);
-    console.log(`🆔 App ID: ${result.applicationId}`);
-    console.log(`📁 Manifest: ${result.manifestPath}`);
-    console.log(`💾 Backup: ${result.backupPath}`);
   } catch (error) {
     console.error(`❌ Failed to add Electron debug identity: ${error.message}`);
     process.exit(1);

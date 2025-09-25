@@ -13,7 +13,7 @@ internal class CreateDebugIdentityCommand : Command
         var manifestOption = new Option<string>("--manifest")
         {
             Description = "Path to the appxmanifest.xml",
-            DefaultValueFactory = (argumentResult) => ".\\.winsdk\\appxmanifest.xml"
+            DefaultValueFactory = (argumentResult) => ".\\appxmanifest.xml"
         };
         var locationOption = new Option<string>("--location")
         {

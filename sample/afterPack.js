@@ -8,17 +8,17 @@ module.exports = async (context) => {
 
   if (context.electronPlatformName === 'win32') {
     const exePath = path.join(context.appOutDir, `${context.packager.appInfo.productName}.exe`);
-    const appxManifestPath = path.join(__dirname, 'msix', 'appxmanifest.xml');
+    const appxManifestPath = path.join(__dirname, 'appxmanifest.xml');
     
     try {
       console.log(`Adding MSIX identity from: ${appxManifestPath}`);
       
       const result = await addMsixIdentityToExe(exePath, appxManifestPath, {
         verbose: true,
-        tempDir: context.appOutDir
+        location: context.appOutDir
       });
       
-      console.log(`Successfully added MSIX identity - Package: ${result.packageName}, Publisher: ${result.publisher}, ApplicationId: ${result.applicationId}`);
+      console.log('Successfully added MSIX identity');
       
     } catch (error) {
       console.error('Error adding MSIX identity to executable:', error.message);

@@ -10,21 +10,26 @@ const { callWinsdkCli } = require('./winsdk-cli-utils');
  * @param {string} appxManifestPath - Path to the appxmanifest.xml file containing MSIX identity data
  * @param {Object} options - Optional configuration
  * @param {boolean} options.verbose - Enable verbose logging (default: true)
- * @param {string} options.tempDir - Directory for temporary files (default: same as exe directory)
+ * @param {string} options.location - Directory for temporary files (default: same as exe directory)
  */
 async function addMsixIdentityToExe(exePath, appxManifestPath, options = {}) {
-  const { verbose = true, tempDir } = options;
+  const { verbose = true, location } = options;
   
   if (verbose) {
     console.log('Adding MSIX identity to executable using native CLI...');
   }
 
   // Build arguments for native CLI
-  const args = ['msix', 'add-identity-to-exe', exePath, appxManifestPath];
+  const args = ['create-debug-identity', exePath];
   
+  // Add manifest argument if provided
+  if (appxManifestPath) {
+    args.push('--manifest', appxManifestPath);
+  }
+
   // Add optional arguments
-  if (tempDir) {
-    args.push('--temp-dir', tempDir);
+  if (location) {
+    args.push('--location', location);
   }
   
   if (verbose) {
@@ -34,29 +39,9 @@ async function addMsixIdentityToExe(exePath, appxManifestPath, options = {}) {
   // Call native CLI
   await callWinsdkCli(args, { verbose });
   
-  // Extract identity information for return value (maintains API compatibility)
-  try {
-    const appxManifestContent = await fs.readFile(appxManifestPath, 'utf8');
-    
-    const nameMatch = appxManifestContent.match(/<Identity[^>]*Name\s*=\s*["']([^"']*)["']/i);
-    const publisherMatch = appxManifestContent.match(/<Identity[^>]*Publisher\s*=\s*["']([^"']*)["']/i);
-    const applicationMatch = appxManifestContent.match(/<Application[^>]*Id\s*=\s*["']([^"']*)["'][^>]*>/i);
-    
-    return {
-      success: true,
-      packageName: nameMatch ? nameMatch[1] : null,
-      publisher: publisherMatch ? publisherMatch[1] : null,
-      applicationId: applicationMatch ? applicationMatch[1] : null
-    };
-  } catch (error) {
-    // If we can't parse the manifest for return values, still return success since CLI succeeded
-    return {
-      success: true,
-      packageName: null,
-      publisher: null,
-      applicationId: null
-    };
-  }
+  return {
+    success: true,
+  };
 }
 
 /**
@@ -120,37 +105,15 @@ async function addElectronDebugIdentity(options = {}) {
     const msixDebugDir = path.resolve('.winsdk/debug');
     const manifestPath = path.join(msixDebugDir, 'appxmanifest.xml');
     
-    // Read the manifest to extract package details for the result
-    let packageName, publisher, applicationId;
-    try {
-      const manifestContent = await fs.readFile(manifestPath, 'utf8');
-      const nameMatch = manifestContent.match(/<Identity[^>]*Name\s*=\s*["']([^"']*)["']/i);
-      const publisherMatch = manifestContent.match(/<Identity[^>]*Publisher\s*=\s*["']([^"']*)["']/i);
-      const applicationMatch = manifestContent.match(/<Application[^>]*Id\s*=\s*["']([^"']*)["']/i);
-      
-      packageName = nameMatch ? nameMatch[1] : 'Unknown';
-      publisher = publisherMatch ? publisherMatch[1] : 'Unknown';
-      applicationId = applicationMatch ? applicationMatch[1] : 'Unknown';
-    } catch (error) {
-      packageName = publisher = applicationId = 'Unknown';
-    }
-    
     const result = {
       success: true,
       electronExePath,
       backupPath: electronBackupPath,
       manifestPath,
       assetsDir: path.join(msixDebugDir, 'Assets'),
-      packageName,
-      publisher,
-      applicationId
     };
     
     if (verbose) {
-      console.log('🎉 Electron debug identity setup completed successfully!');
-      console.log(`📦 Package: ${result.packageName}`);
-      console.log(`👤 Publisher: ${result.publisher}`);
-      console.log(`🆔 App ID: ${result.applicationId}`);
       console.log(`📁 Manifest: ${result.manifestPath}`);
     }
     

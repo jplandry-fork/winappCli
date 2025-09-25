@@ -8,8 +8,8 @@
     "build": "electron-builder --dir",
     "package-msi": "electron-builder",
     "create-msix": "winsdk package ./dist/win-unpacked/ --output-folder ./dist",
-    "build-addon": "node-gyp clean configure build --directory=native",
-    "generate-dev-cert": "winsdk cert generate --publisher \"CN=Metulev\" --output .\\dev-cert.pfx"
+    "build-addon": "winsdk restore & node-gyp clean configure build --directory=native",
+    "setup-debug": "npx winsdk nodejs add-electron-debug-identity"
   },
   "build": {
     "extraFiles": [
