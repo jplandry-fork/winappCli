@@ -2,6 +2,7 @@
 // #include <shobjidl_core.h>
 #include <windows.h>
 
+#include <winrt/Windows.ApplicationModel.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.UI.Notifications.h>
 #include <winrt/Windows.Data.Xml.Dom.h>
@@ -18,6 +19,7 @@
 using namespace winrt;
 using namespace winrt::Windows::UI::Notifications;
 using namespace winrt::Windows::Data::Xml::Dom;
+using namespace winrt::Windows::ApplicationModel;
 
 using namespace Microsoft::Windows::AI;
 using namespace Microsoft::Windows::AI::Text;
@@ -150,48 +152,71 @@ Napi::String CallPhiSilica(const Napi::CallbackInfo& info) {
         // sample intentionally blocks until the model is available.
         try
         {
-            // winrt::init_apartment(winrt::apartment_type::single_threaded);
-            if (LanguageModel::GetReadyState() == AIFeatureReadyState::NotReady)
+            auto const limitedAccessFeatureToken = /* contact CSS for these values */;
+            auto const limitedAccessFeatureAttestation = /* contact CSS for these values */;
+
+            auto access = LimitedAccessFeatures::TryUnlockFeature(
+                L"com.microsoft.windows.ai.languagemodel",
+                limitedAccessFeatureToken,
+                limitedAccessFeatureAttestation);
+
+            auto status = access.Status();
+
+            if ((status == LimitedAccessFeatureStatus::Available) ||
+                (status == LimitedAccessFeatureStatus::AvailableWithoutToken))
             {
-                auto op = LanguageModel::EnsureReadyAsync().get();
-            }
+                // winrt::init_apartment(winrt::apartment_type::single_threaded);
+                if (LanguageModel::GetReadyState() == AIFeatureReadyState::NotReady)
+                {
+                    auto op = LanguageModel::EnsureReadyAsync().get();
+                }
 
-            if (LanguageModel::GetReadyState() == AIFeatureReadyState::Ready)
-            {
-                // Use ThreadSafeFunction to call back to JavaScript thread
-                tsfn.BlockingCall([](Napi::Env env, Napi::Function jsCallback) {
-                    jsCallback.Call({ Napi::String::New(env, "ready") });
-                });
-
-                auto languageModel = LanguageModel::CreateAsync().get();
-                // auto options = LanguageModelOptions();
-                // options.TopK(15);
-                // options.Temperature(0.9f);
-
-                //auto responseWait = languageModel.GenerateResponseAsync(widePrompt, options);
-                auto textSummarizer = winrt::Microsoft::Windows::AI::Text::TextSummarizer(languageModel);
-                auto responseWait = textSummarizer.SummarizeAsync(widePrompt);
-                responseWait.Progress([tsfn](auto const& sender, auto const& progress) {
-                    std::string responseString = winrt::to_string(progress.c_str());
-
-                    tsfn.BlockingCall([responseString](Napi::Env env, Napi::Function jsCallback) {
-                        jsCallback.Call({ Napi::String::New(env, responseString) });
+                if (LanguageModel::GetReadyState() == AIFeatureReadyState::Ready)
+                {
+                    // Use ThreadSafeFunction to call back to JavaScript thread
+                    tsfn.BlockingCall([](Napi::Env env, Napi::Function jsCallback) {
+                        jsCallback.Call({ Napi::String::New(env, "ready") });
                     });
-                });
 
-                auto response = responseWait.get();
-                
-                // Send final response
-                std::string finalResponse = winrt::to_string(response.Text());
-                tsfn.BlockingCall([finalResponse](Napi::Env env, Napi::Function jsCallback) {
-                    jsCallback.Call({ Napi::String::New(env, finalResponse) });
-                });
+                    auto languageModel = LanguageModel::CreateAsync().get();
+                    // auto options = LanguageModelOptions();
+                    // options.TopK(15);
+                    // options.Temperature(0.9f);
+
+                    //auto responseWait = languageModel.GenerateResponseAsync(widePrompt, options);
+                    auto textSummarizer = winrt::Microsoft::Windows::AI::Text::TextSummarizer(languageModel);
+                    auto responseWait = textSummarizer.SummarizeAsync(widePrompt);
+                    responseWait.Progress([tsfn](auto const& sender, auto const& progress) {
+                        std::string responseString = winrt::to_string(progress.c_str());
+
+                        tsfn.BlockingCall([responseString](Napi::Env env, Napi::Function jsCallback) {
+                            jsCallback.Call({ Napi::String::New(env, responseString) });
+                        });
+                    });
+
+                    auto response = responseWait.get();
+                    
+                    // Send final response
+                    std::string finalResponse = winrt::to_string(response.Text());
+                    tsfn.BlockingCall([finalResponse](Napi::Env env, Napi::Function jsCallback) {
+                        jsCallback.Call({ Napi::String::New(env, finalResponse) });
+                    });
+                }
+                else
+                {
+                    // Use ThreadSafeFunction to call back to JavaScript thread
+                    tsfn.BlockingCall([](Napi::Env env, Napi::Function jsCallback) {
+                        jsCallback.Call({ Napi::String::New(env, "not ready") });
+                    });
+                }
             }
             else
             {
-                // Use ThreadSafeFunction to call back to JavaScript thread
-                tsfn.BlockingCall([](Napi::Env env, Napi::Function jsCallback) {
-                    jsCallback.Call({ Napi::String::New(env, "not ready") });
+                std::string errorMsg = "Limited Access Feature not available. Status: " + std::to_string(static_cast<int>(status));
+                
+                // Use ThreadSafeFunction to call back to JavaScript thread with error
+                tsfn.BlockingCall([errorMsg](Napi::Env env, Napi::Function jsCallback) {
+                    jsCallback.Call({ Napi::String::New(env, "error"), Napi::String::New(env, errorMsg) });
                 });
             }
         }
