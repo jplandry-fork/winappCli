@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 namespace Winsdk.Cli.Services;
 
 /// <summary>
@@ -402,6 +404,39 @@ internal class WorkspaceSetupService
                 }
             }
 
+            // Install Windows App Runtime (if not already installed)
+            try
+            {
+                var msixDir = FindWindowsAppSdkMsixDirectory(usedVersions);
+
+                if (msixDir != null)
+                {
+                    if (!options.Quiet)
+                    {
+                        Console.WriteLine($"{UiSymbols.Wrench} Installing Windows App Runtime...");
+                    }
+
+                    // Install Windows App SDK runtime packages
+                    await InstallWindowsAppRuntimeAsync(msixDir, options.Verbose, cancellationToken);
+
+                    if (!options.Quiet)
+                    {
+                        Console.WriteLine($"{UiSymbols.Check} Windows App Runtime installation complete");
+                    }
+                }
+                else if (options.Verbose)
+                {
+                    Console.WriteLine($"{UiSymbols.Note} MSIX directory not found, skipping Windows App Runtime installation");
+                }
+            }
+            catch (Exception ex)
+            {
+                if (options.Verbose)
+                {
+                    Console.WriteLine($"{UiSymbols.Note} Failed to install Windows App Runtime: {ex.Message}");
+                }
+            }
+
             // Step 6.6: Generate AppxManifest.xml (for setup only)
             if (!options.RequireExistingConfig)
             {
@@ -521,5 +556,310 @@ internal class WorkspaceSetupService
             }
             return 1;
         }
+    }
+
+    /// <summary>
+    /// Package entry information from MSIX inventory
+    /// </summary>
+    public class MsixPackageEntry
+    {
+        public required string FileName { get; set; }
+        public required string PackageIdentity { get; set; }
+    }
+
+    /// <summary>
+    /// Parses the MSIX inventory file and returns package entries (shared implementation)
+    /// </summary>
+    /// <param name="msixDir">Directory containing the MSIX packages</param>
+    /// <param name="verbose">Enable verbose logging</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>List of package entries, or null if not found</returns>
+    public static async Task<List<MsixPackageEntry>?> ParseMsixInventoryAsync(string msixDir, bool verbose, CancellationToken cancellationToken)
+    {
+        var architecture = GetSystemArchitecture();
+        
+        if (verbose)
+        {
+            Console.WriteLine($"{UiSymbols.Note} Detected system architecture: {architecture}");
+        }
+
+        // Look for MSIX packages for the current architecture
+        var msixArchDir = Path.Combine(msixDir, $"win10-{architecture}");
+        if (!Directory.Exists(msixArchDir))
+        {
+            if (verbose)
+            {
+                Console.WriteLine($"{UiSymbols.Note} No MSIX packages found for architecture {architecture}");
+                Console.WriteLine($"{UiSymbols.Note} Available directories: {string.Join(", ", Directory.GetDirectories(msixDir).Select(Path.GetFileName))}");
+            }
+            return null;
+        }
+
+        // Read the MSIX inventory file
+        var inventoryPath = Path.Combine(msixArchDir, "msix.inventory");
+        if (!File.Exists(inventoryPath))
+        {
+            if (verbose)
+            {
+                Console.WriteLine($"{UiSymbols.Note} No msix.inventory file found in {msixArchDir}");
+            }
+            return null;
+        }
+
+        var inventoryLines = await File.ReadAllLinesAsync(inventoryPath, cancellationToken);
+        var packageEntries = inventoryLines
+            .Where(line => !string.IsNullOrWhiteSpace(line) && line.Contains('='))
+            .Select(line => line.Split('=', 2))
+            .Where(parts => parts.Length == 2)
+            .Select(parts => new MsixPackageEntry { FileName = parts[0].Trim(), PackageIdentity = parts[1].Trim() })
+            .ToList();
+
+        if (packageEntries.Count == 0)
+        {
+            if (verbose)
+            {
+                Console.WriteLine($"{UiSymbols.Note} No valid package entries found in msix.inventory");
+            }
+            return null;
+        }
+
+        if (verbose)
+        {
+            Console.WriteLine($"{UiSymbols.Package} Found {packageEntries.Count} MSIX packages in inventory");
+        }
+
+        return packageEntries;
+    }
+
+    /// <summary>
+    /// Installs Windows App SDK runtime MSIX packages for the current system architecture
+    /// </summary>
+    /// <param name="msixDir">Directory containing the MSIX packages</param>
+    /// <param name="verbose">Enable verbose logging</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    public async Task InstallWindowsAppRuntimeAsync(string msixDir, bool verbose, CancellationToken cancellationToken)
+    {
+        var powerShellService = new PowerShellService();
+        var architecture = GetSystemArchitecture();
+
+        // Get package entries from MSIX inventory
+        var packageEntries = await ParseMsixInventoryAsync(msixDir, verbose, cancellationToken);
+        if (packageEntries == null || packageEntries.Count == 0)
+        {
+            return;
+        }
+
+        var msixArchDir = Path.Combine(msixDir, $"win10-{architecture}");
+
+        // Install each MSIX package from the inventory
+        foreach (var entry in packageEntries)
+        {
+            try
+            {
+                if (verbose)
+                {
+                    Console.WriteLine($"{UiSymbols.Gear} Checking {entry.FileName}...");
+                }
+
+                // Parse the PackageIdentity (format: Name_Version_Architecture_PublisherId)
+                var identityParts = entry.PackageIdentity.Split('_');
+                var packageName = identityParts[0];
+
+                // Check if this exact package is already installed using PackageFullName
+                var checkCommand = $"Get-AppxPackage | Where-Object {{ $_.PackageFullName -eq '{entry.PackageIdentity}' }}";
+                var (_, existingPackageInfo) = await powerShellService.RunCommandAsync(checkCommand, verbose: false, cancellationToken: cancellationToken);
+
+                if (!string.IsNullOrWhiteSpace(existingPackageInfo))
+                {
+                    if (verbose)
+                    {
+                        Console.WriteLine($"{UiSymbols.Check} {entry.FileName} is already installed (exact match), skipping");
+                    }
+                    continue;
+                }
+
+                // If exact match not found, check for newer versions by package name
+                var checkVersionCommand = $"Get-AppxPackage | Where-Object {{ $_.Name -eq '{packageName}' }} | Select-Object Version";
+                var (_, versionInfo) = await powerShellService.RunCommandAsync(checkVersionCommand, verbose: false, cancellationToken: cancellationToken);
+
+                if (!string.IsNullOrWhiteSpace(versionInfo))
+                {
+                    // Parse the new package version from the PackageIdentity
+                    if (identityParts.Length >= 2)
+                    {
+                        var newVersionString = identityParts[1];
+                        
+                        // Extract version from existing package info
+                        // PowerShell output format has "Version" header followed by version numbers
+                        var lines = versionInfo.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(line => line.Trim())
+                            .Where(line => !string.IsNullOrEmpty(line) && !line.Equals("Version") && !line.StartsWith('-'))
+                            .ToList();
+                        
+                        if (lines.Count > 0)
+                        {
+                            // Use the first version found (they should all be the same for a given package name)
+                            var existingVersionString = lines[0];
+                            
+                            if (Version.TryParse(newVersionString, out var newVersion) && 
+                                Version.TryParse(existingVersionString, out var existingVersion))
+                            {
+                                if (newVersion <= existingVersion)
+                                {
+                                    if (verbose)
+                                    {
+                                        Console.WriteLine($"{UiSymbols.Check} {packageName} v{existingVersionString} is already installed (newer or equal to v{newVersionString}), skipping");
+                                    }
+                                    continue;
+                                }
+                                else if (verbose)
+                                {
+                                    Console.WriteLine($"{UiSymbols.Gear} Upgrading {packageName} from v{existingVersionString} to v{newVersionString}");
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (verbose)
+                {
+                    Console.WriteLine($"{UiSymbols.Gear} Installing {entry.FileName}...");
+                }
+
+                // Install the MSIX package
+                var msixFilePath = Path.Combine(msixArchDir, entry.FileName);
+                if (!File.Exists(msixFilePath))
+                {
+                    if (verbose)
+                    {
+                        Console.WriteLine($"{UiSymbols.Note} MSIX file not found: {msixFilePath}");
+                    }
+                    continue;
+                }
+
+                var installCommand = $"Add-AppxPackage -Path '{msixFilePath}' -ForceApplicationShutdown";
+                var (exitCode, output) = await powerShellService.RunCommandAsync(installCommand, verbose: verbose, cancellationToken: cancellationToken);
+
+                if (exitCode == 0)
+                {
+                    if (verbose)
+                    {
+                        Console.WriteLine($"{UiSymbols.Check} {entry.FileName} installed successfully");
+                    }
+                }
+                else
+                {
+                    if (verbose)
+                    {
+                        Console.WriteLine($"{UiSymbols.Note} {entry.FileName} installation returned exit code {exitCode}");
+                        if (!string.IsNullOrWhiteSpace(output))
+                        {
+                            Console.WriteLine($"{UiSymbols.Note} Output: {output}");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (verbose)
+                {
+                    Console.WriteLine($"{UiSymbols.Note} Failed to install {entry.FileName}: {ex.Message}");
+                }
+                // Continue with other packages even if one fails
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets the current system architecture string for package selection
+    /// </summary>
+    /// <returns>Architecture string (x64, arm64, x86)</returns>
+    public static string GetSystemArchitecture()
+    {
+        var arch = RuntimeInformation.ProcessArchitecture;
+        return arch switch
+        {
+            Architecture.X64 => "x64",
+            Architecture.Arm64 => "arm64",
+            Architecture.X86 => "x86",
+            _ => "x64" // Default fallback
+        };
+    }
+
+    /// <summary>
+    /// Finds the MSIX directory for Windows App SDK runtime packages
+    /// </summary>
+    /// <param name="usedVersions">Optional dictionary of package versions to look for specific installed packages</param>
+    /// <returns>The path to the MSIX directory, or null if not found</returns>
+    public static string? FindWindowsAppSdkMsixDirectory(Dictionary<string, string>? usedVersions = null)
+    {
+        var globalWinsdkDir = BuildToolsService.GetGlobalWinsdkDirectory();
+        var pkgsDir = Path.Combine(globalWinsdkDir, "packages");
+        
+        if (!Directory.Exists(pkgsDir))
+        {
+            return null;
+        }
+
+        // If we have specific versions from package installation, use those first
+        if (usedVersions != null)
+        {
+            // First try Microsoft.WindowsAppSDK.Runtime package (WinAppSDK 1.8+)
+            if (usedVersions.TryGetValue("Microsoft.WindowsAppSDK.Runtime", out var wasdkRuntimeVersion))
+            {
+                var msixDir = TryGetMsixDirectory(pkgsDir, $"Microsoft.WindowsAppSDK.Runtime.{wasdkRuntimeVersion}");
+                if (msixDir != null) return msixDir;
+            }
+            
+            // Fallback: check if runtime is included in the main WindowsAppSDK package (for older versions)
+            if (usedVersions.TryGetValue("Microsoft.WindowsAppSDK", out var wasdkVersion))
+            {
+                var msixDir = TryGetMsixDirectory(pkgsDir, $"Microsoft.WindowsAppSDK.{wasdkVersion}");
+                if (msixDir != null) return msixDir;
+            }
+        }
+
+        // General scan approach: Look for Microsoft.WindowsAppSDK.Runtime packages first (WinAppSDK 1.8+)
+        var runtimePackages = Directory.GetDirectories(pkgsDir, "Microsoft.WindowsAppSDK.Runtime.*");
+        foreach (var runtimePkg in runtimePackages.OrderByDescending(p => p))
+        {
+            var msixDir = TryGetMsixDirectoryFromPath(runtimePkg);
+            if (msixDir != null) return msixDir;
+        }
+
+        // Fallback: check if runtime is included in the main WindowsAppSDK package (for older versions)
+        var mainPackages = Directory.GetDirectories(pkgsDir, "Microsoft.WindowsAppSDK.*")
+            .Where(p => !Path.GetFileName(p).Contains("Runtime", StringComparison.OrdinalIgnoreCase));
+        
+        foreach (var mainPkg in mainPackages.OrderByDescending(p => p))
+        {
+            var msixDir = TryGetMsixDirectoryFromPath(mainPkg);
+            if (msixDir != null) return msixDir;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Helper method to check if an MSIX directory exists for a given package directory name
+    /// </summary>
+    /// <param name="pkgsDir">The packages directory</param>
+    /// <param name="packageDirName">The package directory name</param>
+    /// <returns>The MSIX directory path if it exists, null otherwise</returns>
+    private static string? TryGetMsixDirectory(string pkgsDir, string packageDirName)
+    {
+        var pkgDir = Path.Combine(pkgsDir, packageDirName);
+        return TryGetMsixDirectoryFromPath(pkgDir);
+    }
+
+    /// <summary>
+    /// Helper method to check if an MSIX directory exists for a given package path
+    /// </summary>
+    /// <param name="packagePath">The full path to the package directory</param>
+    /// <returns>The MSIX directory path if it exists, null otherwise</returns>
+    private static string? TryGetMsixDirectoryFromPath(string packagePath)
+    {
+        var msixDir = Path.Combine(packagePath, "tools", "MSIX");
+        return Directory.Exists(msixDir) ? msixDir : null;
     }
 }

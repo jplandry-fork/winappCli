@@ -147,6 +147,9 @@ internal class UpdateCommand : Command
                     return 1;
                 }
 
+                // Step 3: Install Windows App SDK runtime if available
+                await InstallWindowsAppRuntimeIfAvailableAsync(verbose, ct);
+
                 Console.WriteLine($"{UiSymbols.Party} Update completed successfully!");
                 return 0;
             }
@@ -160,5 +163,31 @@ internal class UpdateCommand : Command
                 return 1;
             }
         });
+    }
+
+    private static async Task InstallWindowsAppRuntimeIfAvailableAsync(bool verbose, CancellationToken cancellationToken)
+    {
+        // Find MSIX directory using WorkspaceSetupService logic
+        var msixDir = WorkspaceSetupService.FindWindowsAppSdkMsixDirectory();
+        
+        if (msixDir != null)
+        {
+            if (!verbose)
+            {
+                Console.WriteLine($"{UiSymbols.Wrench} Installing Windows App Runtime...");
+            }
+
+            var workspaceSetupService = new WorkspaceSetupService();
+            await workspaceSetupService.InstallWindowsAppRuntimeAsync(msixDir, verbose, cancellationToken);
+
+            if (!verbose)
+            {
+                Console.WriteLine($"{UiSymbols.Check} Windows App Runtime installation complete");
+            }
+        }
+        else if (verbose)
+        {
+            Console.WriteLine($"{UiSymbols.Note} Windows App SDK packages not found, skipping runtime installation");
+        }
     }
 }

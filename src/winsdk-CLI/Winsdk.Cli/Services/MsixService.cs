@@ -85,10 +85,10 @@ internal class MsixService
 
         // Generate sparse package structure
         var (debugManifestPath, debugIdentity) = await GenerateSparsePackageStructureAsync(
-            appxManifestPath, 
+            appxManifestPath,
             exePath,
-            applicationLocation, 
-            verbose, 
+            applicationLocation,
+            verbose,
             cancellationToken);
 
         // Update executable with debug identity
@@ -105,10 +105,10 @@ internal class MsixService
         {
             // Register the debug appxmanifest
             var workingDirectory = applicationLocation ?? Path.GetDirectoryName(exePath) ?? Directory.GetCurrentDirectory();
-            
+
             // Unregister any existing package first
             await UnregisterExistingPackageAsync(debugIdentity.PackageName, verbose, cancellationToken);
-            
+
             // Register the new debug manifest with external location
             await RegisterSparsePackageAsync(debugManifestPath, workingDirectory, verbose, cancellationToken);
         }
@@ -305,7 +305,7 @@ internal class MsixService
             // Parse the output to extract resource files
             var resourceFiles = new List<string>();
             var lines = stdout.Replace("\0", "").Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-            
+
             foreach (var line in lines)
             {
                 // Look for lines that match the pattern "Resource File: *"
@@ -634,10 +634,10 @@ internal class MsixService
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Tuple containing the debug manifest path and modified identity info</returns>
     public async Task<(string debugManifestPath, MsixIdentityResult debugIdentity)> GenerateSparsePackageStructureAsync(
-        string originalManifestPath, 
+        string originalManifestPath,
         string executablePath,
-        string? baseDirectory = null, 
-        bool verbose = true, 
+        string? baseDirectory = null,
+        bool verbose = true,
         CancellationToken cancellationToken = default)
     {
         var workingDir = baseDirectory ?? Directory.GetCurrentDirectory();
@@ -674,9 +674,9 @@ internal class MsixService
 
         // Step 4: Modify manifest for sparse packaging and debug identity
         var debugManifestContent = CreateDebugManifestContent(
-            originalManifestContent, 
-            originalIdentity, 
-            debugIdentity, 
+            originalManifestContent,
+            originalIdentity,
+            debugIdentity,
             executablePath,
             baseDirectory,
             verbose);
@@ -684,7 +684,7 @@ internal class MsixService
         // Step 5: Write debug manifest
         var debugManifestPath = Path.Combine(debugDir, "appxmanifest.xml");
         await File.WriteAllTextAsync(debugManifestPath, debugManifestContent, Encoding.UTF8, cancellationToken);
-        
+
         if (verbose)
         {
             Console.WriteLine($"📄 Created debug manifest: {debugManifestPath}");
@@ -742,12 +742,12 @@ internal class MsixService
         // Replace executable path with relative path from package root
         var workingDir = baseDirectory ?? Directory.GetCurrentDirectory();
         string relativeExecutablePath;
-        
+
         try
         {
             // Calculate relative path from the working directory (package root) to the executable
             relativeExecutablePath = Path.GetRelativePath(workingDir, executablePath);
-            
+
             // Ensure we use forward slashes for consistency in manifest
             relativeExecutablePath = relativeExecutablePath.Replace('\\', '/');
         }
@@ -756,7 +756,7 @@ internal class MsixService
             // Fallback to just the filename if relative path calculation fails
             relativeExecutablePath = Path.GetFileName(executablePath);
         }
-        
+
         modifiedContent = Regex.Replace(
             modifiedContent,
             @"(<Application[^>]*Executable\s*=\s*)[""']([^""']*)[""']",
@@ -772,7 +772,7 @@ internal class MsixService
                 @"$1 xmlns:uap10=""http://schemas.microsoft.com/appx/manifest/uap/windows10/10""$2",
                 RegexOptions.IgnoreCase);
         }
-        
+
         if (!modifiedContent.Contains("xmlns:desktop6"))
         {
             modifiedContent = Regex.Replace(
@@ -833,12 +833,278 @@ $1",
                 RegexOptions.IgnoreCase);
         }
 
+        // Update or insert Windows App SDK dependency
+        modifiedContent = UpdateWindowsAppSdkDependency(modifiedContent, verbose);
+
         if (verbose)
         {
             Console.WriteLine("✏️  Modified manifest for sparse packaging and debug identity");
         }
 
         return modifiedContent;
+    }
+
+    /// <summary>
+    /// Updates or inserts the Windows App SDK dependency in the manifest
+    /// </summary>
+    /// <param name="manifestContent">The manifest content to modify</param>
+    /// <param name="verbose">Enable verbose logging</param>
+    /// <returns>The modified manifest content</returns>
+    private string UpdateWindowsAppSdkDependency(string manifestContent, bool verbose)
+    {
+        // Get the Windows App SDK version from the locked winsdk.yaml config
+        var winAppSdkInfo = GetWindowsAppSdkDependencyInfo(verbose);
+        
+        if (winAppSdkInfo == null)
+        {
+            if (verbose)
+            {
+                Console.WriteLine("⚠️  Could not determine Windows App SDK version, skipping dependency update");
+            }
+            return manifestContent;
+        }
+
+        // Check if Dependencies section exists
+        if (!manifestContent.Contains("<Dependencies>"))
+        {
+            // Add Dependencies section before Applications
+            manifestContent = Regex.Replace(
+                manifestContent,
+                @"(\s*<Applications>)",
+                $@"  <Dependencies>
+    <PackageDependency Name=""{winAppSdkInfo.RuntimeName}"" MinVersion=""{winAppSdkInfo.MinVersion}"" Publisher=""CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"" />
+  </Dependencies>
+$1",
+                RegexOptions.IgnoreCase);
+                
+            if (verbose)
+            {
+                Console.WriteLine($"📦 Added Windows App SDK dependency {winAppSdkInfo.RuntimeName} (v{winAppSdkInfo.MinVersion})");
+            }
+        }
+        else
+        {
+            // Check if Windows App SDK dependency already exists
+            var existingDependencyPattern = @"<PackageDependency[^>]*Name\s*=\s*[""']Microsoft\.WindowsAppRuntime\.[^""']*[""'][^>]*>";
+            var existingMatch = Regex.Match(manifestContent, existingDependencyPattern, RegexOptions.IgnoreCase);
+            
+            if (existingMatch.Success)
+            {
+                // Update existing dependency
+                var newDependency = $@"<PackageDependency Name=""{winAppSdkInfo.RuntimeName}"" MinVersion=""{winAppSdkInfo.MinVersion}"" Publisher=""CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"" />";
+                manifestContent = Regex.Replace(
+                    manifestContent,
+                    existingDependencyPattern,
+                    newDependency,
+                    RegexOptions.IgnoreCase);
+                    
+                if (verbose)
+                {
+                    Console.WriteLine($"🔄 Updated Windows App SDK dependency to {winAppSdkInfo.RuntimeName} v{winAppSdkInfo.MinVersion}");
+                }
+            }
+            else
+            {
+                // Add new dependency to existing Dependencies section
+                manifestContent = Regex.Replace(
+                    manifestContent,
+                    @"(\s*</Dependencies>)",
+                    $@"    <PackageDependency Name=""{winAppSdkInfo.RuntimeName}"" MinVersion=""{winAppSdkInfo.MinVersion}"" Publisher=""CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"" />
+$1",
+                    RegexOptions.IgnoreCase);
+                    
+                if (verbose)
+                {
+                    Console.WriteLine($"➕ Added Windows App SDK dependency {winAppSdkInfo.RuntimeName} to existing Dependencies section (v{winAppSdkInfo.MinVersion})");
+                }
+            }
+        }
+
+        return manifestContent;
+    }
+
+    /// <summary>
+    /// Gets the Windows App SDK dependency information from the locked winsdk.yaml config and package cache
+    /// </summary>
+    /// <param name="verbose">Enable verbose logging</param>
+    /// <returns>The dependency information, or null if not found</returns>
+    private WindowsAppRuntimePackageInfo? GetWindowsAppSdkDependencyInfo(bool verbose)
+    {
+        try
+        {
+            // Load the locked config to get the actual package versions
+            var configService = new ConfigService(Directory.GetCurrentDirectory());
+            if (!configService.Exists())
+            {
+                if (verbose)
+                {
+                    Console.WriteLine("⚠️  No winsdk.yaml found, cannot determine locked Windows App SDK version");
+                }
+                return null;
+            }
+
+            var config = configService.Load();
+            
+            // Get the main Windows App SDK version from config
+            var mainVersion = config.GetVersion("Microsoft.WindowsAppSDK");
+            
+            if (string.IsNullOrEmpty(mainVersion))
+            {
+                if (verbose)
+                {
+                    Console.WriteLine("⚠️  No Microsoft.WindowsAppSDK package found in winsdk.yaml");
+                }
+                return null;
+            }
+
+            if (verbose)
+            {
+                Console.WriteLine($"📦 Found Windows App SDK main package: v{mainVersion}");
+            }
+
+            // Use PackageCacheService to find the runtime package that was installed with the main package
+            var cacheService = new PackageCacheService();
+            Dictionary<string, string> cachedPackages;
+            
+            try
+            {
+                cachedPackages = cacheService.GetCachedPackageAsync("Microsoft.WindowsAppSDK", mainVersion, CancellationToken.None).GetAwaiter().GetResult();
+            }
+            catch (KeyNotFoundException)
+            {
+                if (verbose)
+                {
+                    Console.WriteLine($"⚠️  Microsoft.WindowsAppSDK v{mainVersion} not found in package cache");
+                }
+                return null;
+            }
+
+            // Look for the runtime package in the cached dependencies
+            var runtimePackage = cachedPackages.FirstOrDefault(kvp => 
+                kvp.Key.StartsWith("Microsoft.WindowsAppSDK.Runtime", StringComparison.OrdinalIgnoreCase));
+
+            // Create a dictionary with versions for FindWindowsAppSdkMsixDirectory
+            var usedVersions = new Dictionary<string, string>
+            {
+                ["Microsoft.WindowsAppSDK"] = mainVersion
+            };
+
+            if (runtimePackage.Key != null)
+            {
+                // For Windows App SDK 1.8+, there's a separate runtime package
+                var runtimeVersion = runtimePackage.Value;
+                usedVersions[runtimePackage.Key] = runtimeVersion;
+                
+                if (verbose)
+                {
+                    Console.WriteLine($"📦 Found cached runtime package: {runtimePackage.Key} v{runtimeVersion}");
+                }
+            }
+            else
+            {
+                // For Windows App SDK 1.7 and earlier, runtime is included in the main package
+                if (verbose)
+                {
+                    Console.WriteLine("📝 No separate runtime package found - using main package (Windows App SDK 1.7 or earlier)");
+                    Console.WriteLine($"📝 Available cached packages: {string.Join(", ", cachedPackages.Keys)}");
+                }
+            }
+
+            // Find the MSIX directory with the runtime package
+            var msixDir = WorkspaceSetupService.FindWindowsAppSdkMsixDirectory(usedVersions);
+            if (msixDir == null)
+            {
+                if (verbose)
+                {
+                    Console.WriteLine("⚠️  Windows App SDK MSIX directory not found for cached runtime package");
+                }
+                return null;
+            }
+
+            // Get the runtime package information from the MSIX inventory
+            var runtimeInfo = GetWindowsAppRuntimePackageInfo(msixDir, verbose);
+            if (runtimeInfo == null)
+            {
+                if (verbose)
+                {
+                    Console.WriteLine("⚠️  Could not parse Windows App Runtime package information from MSIX inventory");
+                }
+                return null;
+            }
+
+            return runtimeInfo;
+        }
+        catch (Exception ex)
+        {
+            if (verbose)
+            {
+                Console.WriteLine($"⚠️  Error getting Windows App SDK dependency info: {ex.Message}");
+            }
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Parses the MSIX inventory file to extract Windows App Runtime package information
+    /// </summary>
+    /// <param name="msixDir">The MSIX directory containing the inventory file</param>
+    /// <param name="verbose">Enable verbose logging</param>
+    /// <returns>Package information, or null if not found</returns>
+    private static WindowsAppRuntimePackageInfo? GetWindowsAppRuntimePackageInfo(string msixDir, bool verbose = false)
+    {
+        try
+        {
+            // Use the shared inventory parsing logic (synchronous version)
+            var packageEntries = WorkspaceSetupService.ParseMsixInventoryAsync(msixDir, verbose, CancellationToken.None).GetAwaiter().GetResult();
+            
+            if (packageEntries == null || packageEntries.Count == 0)
+            {
+                return null;
+            }
+
+            // Look for the Windows App Runtime main package (not Framework packages)
+            var mainRuntimeEntry = packageEntries
+                .FirstOrDefault(entry => entry.PackageIdentity.StartsWith("Microsoft.WindowsAppRuntime.") && 
+                                       !entry.PackageIdentity.Contains("Framework"));
+
+            if (mainRuntimeEntry != null)
+            {
+                // Parse the PackageIdentity (format: Name_Version_Architecture_PublisherId)
+                var identityParts = mainRuntimeEntry.PackageIdentity.Split('_');
+                if (identityParts.Length >= 2)
+                {
+                    var runtimeName = identityParts[0];
+                    var version = identityParts[1];
+                    
+                    if (verbose)
+                    {
+                        Console.WriteLine($"{UiSymbols.Package} Found Windows App Runtime: {runtimeName} v{version}");
+                    }
+
+                    return new WindowsAppRuntimePackageInfo
+                    {
+                        RuntimeName = runtimeName,
+                        MinVersion = version
+                    };
+                }
+            }
+
+            if (verbose)
+            {
+                Console.WriteLine($"{UiSymbols.Note} No Windows App Runtime main package found in inventory");
+                Console.WriteLine($"{UiSymbols.Note} Available packages: {string.Join(", ", packageEntries.Select(e => e.PackageIdentity))}");
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            if (verbose)
+            {
+                Console.WriteLine($"{UiSymbols.Note} Error parsing MSIX inventory: {ex.Message}");
+            }
+            return null;
+        }
     }
 
     /// <summary>
@@ -867,17 +1133,17 @@ $1",
     private static async Task<int> CopyDirectoryRecursiveAsync(string sourceDir, string targetDir, bool verbose)
     {
         var filesCopied = 0;
-        
+
         // List of directories to exclude from copying
         var excludedDirectories = new List<string> { ".winsdk", ".git" };
-        
+
         // Get all files in current directory
         var files = Directory.GetFiles(sourceDir);
-        
+
         foreach (var file in files)
         {
             var fileName = Path.GetFileName(file);
-            
+
             // Skip appxmanifest.xml as we've already created the debug version
             if (fileName.Equals("appxmanifest.xml", StringComparison.OrdinalIgnoreCase))
             {
@@ -887,23 +1153,23 @@ $1",
                 }
                 continue;
             }
-            
+
             var targetFile = Path.Combine(targetDir, fileName);
-            
+
             // Ensure target directory exists
             Directory.CreateDirectory(targetDir);
-            
+
             File.Copy(file, targetFile, overwrite: true);
             filesCopied++;
         }
 
         // Get all subdirectories and copy them recursively
         var directories = Directory.GetDirectories(sourceDir);
-        
+
         foreach (var directory in directories)
         {
             var dirName = Path.GetFileName(directory);
-            
+
             // Skip directories that are in the exclusion list
             if (excludedDirectories.Any(excluded => dirName.Equals(excluded, StringComparison.OrdinalIgnoreCase)))
             {
@@ -913,12 +1179,12 @@ $1",
                 }
                 continue;
             }
-            
+
             var targetSubDir = Path.Combine(targetDir, dirName);
             var subDirFilesCopied = await CopyDirectoryRecursiveAsync(directory, targetSubDir, verbose);
             filesCopied += subDirFilesCopied;
         }
-        
+
         return filesCopied;
     }
 
@@ -995,7 +1261,7 @@ $1",
         }
 
         var registerCommand = $"Add-AppxPackage -Path '{manifestPath}' -ExternalLocation '{externalLocation}' -Register -ForceUpdateFromAnyVersion";
-        
+
         try
         {
             var (exitCode, _) = await _powerShellService.RunCommandAsync(registerCommand, verbose: verbose, cancellationToken: cancellationToken);
@@ -1015,5 +1281,4 @@ $1",
             throw new InvalidOperationException($"Failed to register sparse package: {ex.Message}", ex);
         }
     }
-
 }
