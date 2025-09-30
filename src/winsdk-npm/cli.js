@@ -12,7 +12,7 @@ const os = require('os');
 const CLI_NAME = 'winsdk';
 
 // Commands that should be handled by Node.js (everything else goes to winsdk-cli)
-const NODE_ONLY_COMMANDS = new Set(['nodejs']);
+const NODE_ONLY_COMMANDS = new Set(['node']);
 
 /**
  * Main CLI entry point for winsdk package
@@ -57,8 +57,8 @@ async function main() {
 
 async function handleNodeCommand(command, args) {
   switch (command) {
-    case 'nodejs':
-      await handleNodejs(args);
+    case 'node':
+      await handleNode(args);
       break;
       
     default:
@@ -99,15 +99,15 @@ async function showCombinedHelp() {
   // Add Node.js-specific commands
   console.log('');
   console.log('Node.js Extensions:');
-  console.log('  nodejs <subcommand>         Node.js-specific commands');
+  console.log('  node <subcommand>         Node.js-specific commands');
   console.log('');
   console.log('Node.js Subcommands:');
-  console.log('  nodejs addon generate       Generate native addon files for Electron');
-  console.log('  nodejs add-electron-debug-identity  Add MSIX identity to Electron debug process');
+  console.log('  node addon generate       Generate native addon files for Electron');
+  console.log('  node add-electron-debug-identity  Add MSIX identity to Electron debug process');
   console.log('');
   console.log('Examples:');
-  console.log(`  ${CLI_NAME} nodejs addon generate --name myAddon`);
-  console.log(`  ${CLI_NAME} nodejs add-electron-debug-identity`);
+  console.log(`  ${CLI_NAME} node addon generate --name myAddon`);
+  console.log(`  ${CLI_NAME} node add-electron-debug-identity`);
 }
 
 async function showVersion() {
@@ -158,9 +158,9 @@ if (require.main === module) {
 
 module.exports = { main };
 
-async function handleNodejs(args) {
+async function handleNode(args) {
   if (args.length === 0) {
-    console.log(`Usage: ${CLI_NAME} nodejs <subcommand> [options]`);
+    console.log(`Usage: ${CLI_NAME} node <subcommand> [options]`);
     console.log('');
     console.log('Node.js-specific commands');
     console.log('');
@@ -172,10 +172,10 @@ async function handleNodejs(args) {
     console.log('  addon generate              Generate native addon files for Electron');
     console.log('');
     console.log('Examples:');
-    console.log(`  ${CLI_NAME} nodejs addon generate --name myAddon`);
-    console.log(`  ${CLI_NAME} nodejs add-electron-debug-identity`);
+    console.log(`  ${CLI_NAME} node addon generate --name myAddon`);
+    console.log(`  ${CLI_NAME} node add-electron-debug-identity`);
     console.log('');
-    console.log(`Use "${CLI_NAME} nodejs <subcommand> --help" for detailed help on each subcommand.`);
+    console.log(`Use "${CLI_NAME} node <subcommand> --help" for detailed help on each subcommand.`);
     return;
   }
 
@@ -192,15 +192,15 @@ async function handleNodejs(args) {
       break;
       
     default:
-      console.error(`❌ Unknown nodejs subcommand: ${subcommand}`);
-      console.error(`Run "${CLI_NAME} nodejs" for available subcommands.`);
+      console.error(`❌ Unknown node subcommand: ${subcommand}`);
+      console.error(`Run "${CLI_NAME} node" for available subcommands.`);
       process.exit(1);
   }
 }
 
 async function handleAddon(args) {
   if (args.length === 0) {
-    console.log(`Usage: ${CLI_NAME} nodejs addon <subcommand> [options]`);
+    console.log(`Usage: ${CLI_NAME} node addon <subcommand> [options]`);
     console.log('');
     console.log('Native addon generation commands');
     console.log('');
@@ -208,9 +208,9 @@ async function handleAddon(args) {
     console.log('  generate                    Generate native addon files for Electron');
     console.log('');
     console.log('Examples:');
-    console.log(`  ${CLI_NAME} nodejs addon generate --name myAddon`);
+    console.log(`  ${CLI_NAME} node addon generate --name myAddon`);
     console.log('');
-    console.log(`Use "${CLI_NAME} nodejs addon <subcommand> --help" for detailed help on each subcommand.`);
+    console.log(`Use "${CLI_NAME} node addon <subcommand> --help" for detailed help on each subcommand.`);
     return;
   }
 
@@ -224,7 +224,7 @@ async function handleAddon(args) {
       
     default:
       console.error(`❌ Unknown addon subcommand: ${subcommand}`);
-      console.error(`Run "${CLI_NAME} nodejs addon" for available subcommands.`);
+      console.error(`Run "${CLI_NAME} node addon" for available subcommands.`);
       process.exit(1);
   }
 }
@@ -236,7 +236,7 @@ async function handleAddonGenerate(args) {
   });
 
   if (options.help) {
-    console.log(`Usage: ${CLI_NAME} nodejs addon generate [options]`);
+    console.log(`Usage: ${CLI_NAME} node addon generate [options]`);
     console.log('');
     console.log('Generate native addon files for Electron project');
     console.log('');
@@ -252,8 +252,8 @@ async function handleAddonGenerate(args) {
     console.log('  --help                Show this help');
     console.log('');
     console.log('Examples:');
-    console.log(`  ${CLI_NAME} nodejs addon generate`);
-    console.log(`  ${CLI_NAME} nodejs addon generate --name myCustomAddon`);
+    console.log(`  ${CLI_NAME} node addon generate`);
+    console.log(`  ${CLI_NAME} node addon generate --name myCustomAddon`);
     console.log('');
     console.log('Note: This command must be run from the root of an Electron project');
     console.log('      (directory containing package.json)');
@@ -284,7 +284,7 @@ async function handleAddonElectronDebugIdentity(args) {
   });
 
   if (options.help) {
-    console.log(`Usage: ${CLI_NAME} nodejs add-electron-debug-identity [options]`);
+    console.log(`Usage: ${CLI_NAME} node add-electron-debug-identity [options]`);
     console.log('');
     console.log('Add MSIX identity to Electron debug process');
     console.log('');

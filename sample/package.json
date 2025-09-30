@@ -9,7 +9,7 @@
     "package-msi": "electron-builder",
     "create-msix": "npx build & winsdk package ./dist/win-unpacked/ --output-folder ./dist",
     "build-addon": "winsdk restore & node-gyp clean configure build --directory=native",
-    "setup-debug": "npx winsdk nodejs add-electron-debug-identity"
+    "setup-debug": "npx winsdk node add-electron-debug-identity"
   },
   "build": {
     "extraFiles": [
