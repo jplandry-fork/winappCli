@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Security;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml;
 using Winsdk.Cli.Services;
 
 namespace Winsdk.Cli;
@@ -51,12 +52,12 @@ internal class MsixService
             if (packageEntries != null)
             {
                 // Look for the base Windows App Runtime package (not Framework, DDLM, or Singleton packages)
-                var mainRuntimeEntry = packageEntries.FirstOrDefault(entry => 
-                    entry.PackageIdentity.StartsWith("Microsoft.WindowsAppRuntime.") && 
+                var mainRuntimeEntry = packageEntries.FirstOrDefault(entry =>
+                    entry.PackageIdentity.StartsWith("Microsoft.WindowsAppRuntime.") &&
                     !entry.PackageIdentity.Contains("Framework") &&
                     !entry.FileName.Contains("DDLM", StringComparison.OrdinalIgnoreCase) &&
                     !entry.FileName.Contains("Singleton", StringComparison.OrdinalIgnoreCase));
-                
+
                 if (mainRuntimeEntry != null)
                 {
                     msixPath = Path.Combine(msixToolsDir, mainRuntimeEntry.FileName);
@@ -86,7 +87,7 @@ internal class MsixService
 
             // Look for the base runtime package (format: Microsoft.WindowsAppRuntime.{version}.msix)
             // Exclude files with additional suffixes like DDLM, Singleton, Framework, etc.
-            msixPath = msixFiles.FirstOrDefault(f => 
+            msixPath = msixFiles.FirstOrDefault(f =>
             {
                 var fileName = Path.GetFileName(f);
                 return !fileName.Contains("DDLM", StringComparison.OrdinalIgnoreCase) &&
@@ -241,26 +242,25 @@ internal class MsixService
     private async Task EmbedMsixIdentityToExeAsync(string exePath, MsixIdentityResult identityInfo, string? applicationLocation, bool verbose, CancellationToken cancellationToken)
     {
         // Create the MSIX element for the win32 manifest
-        var msixElement = $@"<msix xmlns=""urn:schemas-microsoft-com:msix.v1""
-            publisher=""{SecurityElement.Escape(identityInfo.Publisher)}""
-            packageName=""{SecurityElement.Escape(identityInfo.PackageName)}""
-            applicationId=""{SecurityElement.Escape(identityInfo.ApplicationId)}""
-        />";
 
         var manifestContent = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
 <assembly xmlns=""urn:schemas-microsoft-com:asm.v1"" manifestVersion=""1.0"">
-  {msixElement}
+  <msix xmlns=""urn:schemas-microsoft-com:msix.v1""
+            publisher=""{SecurityElement.Escape(identityInfo.Publisher)}""
+            packageName=""{SecurityElement.Escape(identityInfo.PackageName)}""
+            applicationId=""{SecurityElement.Escape(identityInfo.ApplicationId)}""
+        />
   <assemblyIdentity version=""1.0.0.0"" name=""{SecurityElement.Escape(identityInfo.PackageName)}"" type=""win32""/>
 </assembly>";
 
         // Create a temporary manifest file
         var workingDir = applicationLocation ?? Path.GetDirectoryName(exePath)!;
         var tempManifestPath = Path.Combine(workingDir, "msix_identity_temp.manifest");
-        
+
         try
         {
             await File.WriteAllTextAsync(tempManifestPath, manifestContent, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), cancellationToken);
-            
+
             // Use mt.exe to merge manifests
             await EmbedManifestFileToExeAsync(exePath, tempManifestPath, applicationLocation, verbose, cancellationToken);
         }
@@ -279,9 +279,9 @@ internal class MsixService
     /// <param name="verbose">Enable verbose logging</param>
     /// <param name="cancellationToken">Cancellation token</param>
     private async Task EmbedManifestFileToExeAsync(
-        string exePath, 
+        string exePath,
         string manifestPath,
-        string? applicationLocation = null, 
+        string? applicationLocation = null,
         bool verbose = false,
         CancellationToken cancellationToken = default)
     {
@@ -391,6 +391,16 @@ internal class MsixService
         if (!Directory.Exists(packageDir))
             throw new DirectoryNotFoundException($"Package directory not found: {packageDir}");
 
+        var resfilesPath = Path.Combine(packageDir, "pri.resfiles");
+        var priFiles = (new DirectoryInfo(packageDir).EnumerateFiles("*.pri").Select(di => di.FullName)).ToList();
+        using (var writer = new StreamWriter(resfilesPath))
+        {
+            foreach (var priFile in priFiles)
+            {
+                writer.WriteLine(priFile);
+            }
+        }
+
         var configPath = Path.Combine(packageDir, "priconfig.xml");
         var arguments = $@"createconfig /cf ""{configPath}"" /dq {language} /pv {platformVersion} /o";
 
@@ -406,6 +416,20 @@ internal class MsixService
             if (verbose)
             {
                 Console.WriteLine($"PRI configuration created: {configPath}");
+            }
+
+            var xmlDoc = new XmlDocument();
+            xmlDoc.Load(configPath);
+            var resourcesNode = xmlDoc.SelectSingleNode("/resources");
+            if (resourcesNode != null)
+            {
+                var indexNode = resourcesNode.SelectSingleNode("index");
+                if (indexNode?.Attributes?["startIndexAt"]?.Value != null)
+                {
+                    // set to relative path
+                    indexNode!.Attributes!["startIndexAt"]!.Value = ".\\pri.resfiles";
+                    xmlDoc.Save(configPath);
+                }
             }
 
             return configPath;
@@ -610,7 +634,7 @@ internal class MsixService
 
         var executableMatch = Regex.Match(manifestContent, @"<Application[^>]*Executable\s*=\s*[""']([^""']*)[""']", RegexOptions.IgnoreCase);
         string executablePath = executableMatch.Success ? executableMatch.Groups[1].Value : string.Empty;
-        
+
         if (!string.IsNullOrWhiteSpace(executablePath) && !Path.IsPathRooted(executablePath))
         {
             executablePath = Path.GetFullPath(Path.Combine(inputFolder, executablePath));
@@ -660,10 +684,12 @@ internal class MsixService
                     Console.WriteLine($"{UiSymbols.Package} Preparing self-contained Windows App SDK runtime...");
                 }
 
-                await PrepareRuntimeForPackagingAsync(inputFolder, verbose, cancellationToken);
+                var winAppSDKDeploymentDir = await PrepareRuntimeForPackagingAsync(inputFolder, verbose, cancellationToken);
 
                 // Add WindowsAppSDK.manifest to existing manifest
-                await EmbedWindowsAppSDKManifestToExeAsync(executablePath, inputFolder, verbose, cancellationToken);
+                var resolvedDeploymentDir = Path.Combine(winAppSDKDeploymentDir, "..", "extracted");
+                var windowsAppSDKManifestPath = Path.Combine(resolvedDeploymentDir, "AppxManifest.xml");
+                await EmbedWindowsAppSDKManifestToExeAsync(executablePath, winAppSDKDeploymentDir, inputFolder, windowsAppSDKManifestPath, verbose, cancellationToken);
             }
 
             await CreateMsixPackageFromFolderAsync(inputFolder, verbose, outputMsixPath, cancellationToken);
@@ -715,19 +741,55 @@ internal class MsixService
         return new CreateMsixPackageResult(outputMsixPath, autoSign);
     }
 
-    private async Task EmbedWindowsAppSDKManifestToExeAsync(string exePath, string? applicationLocation, bool verbose, CancellationToken cancellationToken)
+    private async Task EmbedWindowsAppSDKManifestToExeAsync(string exePath, string winAppSDKDeploymentDir, string? applicationLocation, string windowsAppSDKAppXManifestPath, bool verbose, CancellationToken cancellationToken)
     {
-        // Load the complete Windows App SDK manifest template
-        string windowsAppSDKManifestContent = await ManifestTemplateService.LoadTemplateAsync("WindowsAppSDK.manifest", cancellationToken);
-        
-        // Create a temporary manifest file
+        // Use applicationLocation for DLL content (where runtime files were copied by PrepareRuntimeForPackagingAsync)
         var workingDir = applicationLocation ?? Path.GetDirectoryName(exePath)!;
+
+        if (verbose)
+        {
+            Console.WriteLine($"📄 Generating Windows App SDK manifest from: {windowsAppSDKAppXManifestPath}");
+            Console.WriteLine($"📦 Using DLL content from: {winAppSDKDeploymentDir}");
+        }
+
+        var dllFiles = (new DirectoryInfo(winAppSDKDeploymentDir).EnumerateFiles("*.dll").Select(di => di.Name)).ToList();
+
+        // Create a temporary manifest file
         var tempManifestPath = Path.Combine(workingDir, "WindowsAppSDK_temp.manifest");
-        
+
         try
         {
-            await File.WriteAllTextAsync(tempManifestPath, windowsAppSDKManifestContent, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), cancellationToken);
-            
+            // Generate the manifest content
+            await GenerateAppManifestFromAppxAsync(
+                redirectDlls: false,
+                inDllFiles: dllFiles,
+                inAppxManifests: [windowsAppSDKAppXManifestPath],
+                fragments: false,
+                outAppManifestPath: tempManifestPath,
+                verbose: verbose,
+                cancellationToken: cancellationToken);
+
+            (var cachedPackages, var mainVersion) = GetCachedPackages(verbose);
+            if (cachedPackages == null || cachedPackages.Count == 0)
+            {
+                throw new InvalidOperationException("No cached Windows SDK packages found. Please install the Windows SDK or Windows App SDK.");
+            }
+
+            IEnumerable<string> appxFragments = GetComponents(cachedPackages);
+            var architecture = WorkspaceSetupService.GetSystemArchitecture();
+            dllFiles = [.. appxFragments.Select(fragment => Path.Combine(Path.GetDirectoryName(fragment)!, $"win-{architecture}\\native"))
+                .Where(Directory.Exists)
+                .SelectMany(dir => Directory.EnumerateFiles(dir, "*.dll"))];
+
+            await GenerateAppManifestFromAppxAsync(
+                redirectDlls: false,
+                inDllFiles: dllFiles,
+                inAppxManifests: appxFragments,
+                fragments: true,
+                outAppManifestPath: tempManifestPath,
+                verbose: verbose,
+                cancellationToken: cancellationToken);
+
             // Use mt.exe to merge manifests
             await EmbedManifestFileToExeAsync(exePath, tempManifestPath, applicationLocation, verbose, cancellationToken);
         }
@@ -737,7 +799,183 @@ internal class MsixService
         }
     }
 
+    private static IEnumerable<string> GetComponents(Dictionary<string, string> cachedPackages)
+    {
+        var winsdkDir = BuildToolsService.GetGlobalWinsdkDirectory();
+        var packagesDir = Path.Combine(winsdkDir, "packages");
+        if (!Directory.Exists(packagesDir))
+        {
+            throw new DirectoryNotFoundException($"Packages directory not found: {packagesDir}");
+        }
 
+        // Find the packages directory
+        var appxFragments = cachedPackages
+            .Select(cachedPackage => Path.Combine(packagesDir, $"{cachedPackage.Key}.{cachedPackage.Value}", "runtimes-framework", "package.appxfragment"))
+            .Where(File.Exists);
+        return appxFragments;
+    }
+
+    /// <summary>
+    /// Generates a Win32 manifest from an AppX manifest, similar to the GenerateAppManifestFromAppx MSBuild task.
+    /// </summary>
+    /// <param name="redirectDlls">Whether to redirect DLLs to %MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY%</param>
+    /// <param name="inDllFiles">List of DLL files to include</param>
+    /// <param name="inAppxManifests">List of paths to the input AppX manifest files, or fragments</param>
+    /// <param name="fragments">Whether the input manifests are fragments (false), or full manifests (true)</param>
+    /// <param name="verbose">Enable verbose logging</param>
+    /// <returns>Generated manifest content</returns>
+    private async Task GenerateAppManifestFromAppxAsync(
+        bool redirectDlls,
+        IEnumerable<string> inDllFiles,
+        IEnumerable<string> inAppxManifests,
+        bool fragments,
+        string outAppManifestPath,
+        bool verbose,
+        CancellationToken cancellationToken)
+    {
+        var sb = new StringBuilder();
+
+        // Write manifest header
+        sb.AppendLine("<?xml version='1.0' encoding='utf-8' standalone='yes'?>");
+        sb.AppendLine("<assembly manifestVersion='1.0'");
+        sb.AppendLine("    xmlns:asmv3='urn:schemas-microsoft-com:asm.v3'");
+        sb.AppendLine("    xmlns:winrtv1='urn:schemas-microsoft-com:winrt.v1'");
+        sb.AppendLine("    xmlns='urn:schemas-microsoft-com:asm.v1'>");
+
+        var prefix = fragments ? "Fragment" : "Package";
+
+        var dllFileFormat = redirectDlls ?
+            @"    <asmv3:file name='{0}' loadFrom='%MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY%{0}'>" :
+            @"    <asmv3:file name='{0}'>";
+
+        var dllFiles = inDllFiles.ToList();
+
+        foreach (var inAppxManifest in inAppxManifests)
+        {
+            XmlDocument doc = new();
+            doc.Load(inAppxManifest);
+            var nsmgr = new XmlNamespaceManager(doc.NameTable);
+            nsmgr.AddNamespace("m", "http://schemas.microsoft.com/appx/manifest/foundation/windows10");
+            // Add InProcessServer elements to the generated appxmanifest
+            var xQuery = $"./m:{prefix}/m:Extensions/m:Extension/m:InProcessServer";
+            XmlNodeList? inProcessServers = doc.SelectNodes(xQuery, nsmgr);
+            if (inProcessServers != null)
+            {
+                foreach (XmlNode winRTFactory in inProcessServers)
+                {
+                    var dllFileNode = winRTFactory.SelectSingleNode("./m:Path", nsmgr);
+                    if (dllFileNode == null) continue;
+                    var dllFile = dllFileNode.InnerText;
+                    var typesNames = winRTFactory.SelectNodes("./m:ActivatableClass", nsmgr)?.OfType<XmlNode>();
+                    sb.AppendFormat(dllFileFormat, dllFile);
+                    sb.AppendLine();
+                    if (typesNames != null)
+                    {
+                        foreach (var typeNode in typesNames)
+                        {
+                            var attribs = typeNode.Attributes?.OfType<XmlAttribute>().ToArray();
+                            var typeName = attribs
+                                ?.OfType<XmlAttribute>()
+                                ?.SingleOrDefault(x => x.Name == "ActivatableClassId")
+                                ?.InnerText;
+                            var xmlEntryFormat =
+        @"        <winrtv1:activatableClass name='{0}' threadingModel='both'/>";
+                            sb.AppendFormat(xmlEntryFormat, typeName);
+                            sb.AppendLine();
+                            dllFiles.RemoveAll(e => e.Equals(dllFile, StringComparison.OrdinalIgnoreCase));
+                        }
+                    }
+                    sb.AppendLine(@"    </asmv3:file>");
+                }
+            }
+
+            // Only if packages
+            if (!fragments && redirectDlls)
+            {
+                foreach (var dllFile in dllFiles)
+                {
+                    sb.AppendFormat(dllFileFormat, dllFile);
+                    sb.AppendLine(@"</asmv3:file>");
+                }
+            }
+            // Add ProxyStub elements to the generated appxmanifest
+            dllFiles = inDllFiles.ToList();
+
+            xQuery = $"./m:{prefix}/m:Extensions/m:Extension/m:ProxyStub";
+            var inProcessProxystubs = doc.SelectNodes(xQuery, nsmgr);
+            if (inProcessProxystubs != null)
+            {
+                foreach (XmlNode proxystub in inProcessProxystubs)
+                {
+                    var classIDAdded = false;
+
+                    var dllFileNode = proxystub.SelectSingleNode("./m:Path", nsmgr);
+                    var dllFile = dllFileNode?.InnerText;
+                    // exclude PushNotificationsLongRunningTask, which requires the Singleton (which is unavailable for self-contained apps)
+                    // exclude Widgets entries unless/until they have been tested and verified by the Widgets team
+                    if (dllFile == null || dllFile == "PushNotificationsLongRunningTask.ProxyStub.dll" || dllFile == "Microsoft.Windows.Widgets.dll")
+                    {
+                        continue;
+                    }
+                    var typesNamesForProxy = proxystub.SelectNodes("./m:Interface", nsmgr)?.OfType<XmlNode>();
+                    sb.AppendFormat(dllFileFormat, dllFile);
+                    sb.AppendLine();
+                    if (typesNamesForProxy != null)
+                    {
+                        foreach (var typeNode in typesNamesForProxy)
+                        {
+                            if (!classIDAdded)
+                            {
+                                var classIdAttribute = proxystub.Attributes?.OfType<XmlAttribute>().ToArray();
+                                var classID = classIdAttribute
+                                    ?.OfType<XmlAttribute>()
+                                    ?.SingleOrDefault(x => x.Name == "ClassId")
+                                    ?.InnerText;
+
+                                if (classID != null)
+                                {
+                                    var xmlEntryFormat = @"        <asmv3:comClass clsid='{{{0}}}'/>";
+                                    sb.AppendFormat(xmlEntryFormat, classID);
+                                    classIDAdded = true;
+                                }
+                            }
+                            var attribs = typeNode.Attributes?.OfType<XmlAttribute>().ToArray();
+                            var typeID = attribs
+                                ?.OfType<XmlAttribute>()
+                                ?.SingleOrDefault(x => x.Name == "InterfaceId")
+                                ?.InnerText;
+                            var typeNames = attribs
+                                ?.OfType<XmlAttribute>()
+                                ?.SingleOrDefault(x => x.Name == "Name")
+                                ?.InnerText;
+                            var xmlEntryFormatForStubs = @"        <asmv3:comInterfaceProxyStub name='{0}' iid='{{{1}}}'/>";
+                            if (typeNames != null && typeID != null)
+                            {
+                                sb.AppendFormat(xmlEntryFormatForStubs, typeNames, typeID);
+                                sb.AppendLine();
+                                dllFiles.RemoveAll(e => e.Equals(dllFile, StringComparison.OrdinalIgnoreCase));
+                            }
+                        }
+                    }
+                    sb.AppendLine(@"    </asmv3:file>");
+                }
+            }
+        }
+
+        if (!fragments && redirectDlls)
+        {
+            foreach (var dllFile in dllFiles)
+            {
+                sb.AppendFormat(dllFileFormat, dllFile);
+                sb.AppendLine(@"</asmv3:file>");
+            }
+        }
+        
+        sb.AppendLine(@"</assembly>");
+        var manifestContent = sb.ToString();
+
+        await File.WriteAllTextAsync(outAppManifestPath, manifestContent, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), cancellationToken);
+    }
 
     private async Task SignMsixPackageAsync(string outputFolder, string certificatePassword, bool generateDevCert, bool installDevCert, bool verbose, string finalPackageName, string? extractedPublisher, string outputMsixPath, string? certPath, CancellationToken cancellationToken)
     {
@@ -937,11 +1175,11 @@ internal class MsixService
         if (identity != null)
         {
             // Replace package identity attributes
-                modifiedContent = Regex.Replace(
-                modifiedContent,
-                @"(<Identity[^>]*Name\s*=\s*)[""']([^""']*)[""']",
-                $@"$1""{identity.PackageName}""",
-                RegexOptions.IgnoreCase);
+            modifiedContent = Regex.Replace(
+            modifiedContent,
+            @"(<Identity[^>]*Name\s*=\s*)[""']([^""']*)[""']",
+            $@"$1""{identity.PackageName}""",
+            RegexOptions.IgnoreCase);
 
             // Replace application ID
             modifiedContent = Regex.Replace(
@@ -1071,7 +1309,7 @@ $1",
     {
         // Get the Windows App SDK version from the locked winsdk.yaml config
         var winAppSdkInfo = GetWindowsAppSdkDependencyInfo(verbose);
-        
+
         if (winAppSdkInfo == null)
         {
             if (verbose)
@@ -1093,7 +1331,7 @@ $1",
   </Dependencies>
 $1",
                 RegexOptions.IgnoreCase);
-                
+
             if (verbose)
             {
                 Console.WriteLine($"📦 Added Windows App SDK dependency {winAppSdkInfo.RuntimeName} (v{winAppSdkInfo.MinVersion})");
@@ -1104,7 +1342,7 @@ $1",
             // Check if Windows App SDK dependency already exists
             var existingDependencyPattern = @"<PackageDependency[^>]*Name\s*=\s*[""']Microsoft\.WindowsAppRuntime\.[^""']*[""'][^>]*>";
             var existingMatch = Regex.Match(manifestContent, existingDependencyPattern, RegexOptions.IgnoreCase);
-            
+
             if (existingMatch.Success)
             {
                 // Update existing dependency
@@ -1114,7 +1352,7 @@ $1",
                     existingDependencyPattern,
                     newDependency,
                     RegexOptions.IgnoreCase);
-                    
+
                 if (verbose)
                 {
                     Console.WriteLine($"🔄 Updated Windows App SDK dependency to {winAppSdkInfo.RuntimeName} v{winAppSdkInfo.MinVersion}");
@@ -1129,7 +1367,7 @@ $1",
                     $@"    <PackageDependency Name=""{winAppSdkInfo.RuntimeName}"" MinVersion=""{winAppSdkInfo.MinVersion}"" Publisher=""CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"" />
 $1",
                     RegexOptions.IgnoreCase);
-                    
+
                 if (verbose)
                 {
                     Console.WriteLine($"➕ Added Windows App SDK dependency {winAppSdkInfo.RuntimeName} to existing Dependencies section (v{winAppSdkInfo.MinVersion})");
@@ -1180,53 +1418,12 @@ $1",
 
     private static string? GetRuntimeMsixDir(bool verbose)
     {
-        // Load the locked config to get the actual package versions
-        var configService = new ConfigService(Directory.GetCurrentDirectory());
-        if (!configService.Exists())
+        (var cachedPackages, var mainVersion) = GetCachedPackages(verbose);
+        if (cachedPackages == null || mainVersion == null)
         {
-            if (verbose)
-            {
-                Console.WriteLine("⚠️  No winsdk.yaml found, cannot determine locked Windows App SDK version");
-            }
             return null;
         }
-
-        var config = configService.Load();
-
-        // Get the main Windows App SDK version from config
-        var mainVersion = config.GetVersion("Microsoft.WindowsAppSDK");
-
-        if (string.IsNullOrEmpty(mainVersion))
-        {
-            if (verbose)
-            {
-                Console.WriteLine("⚠️  No Microsoft.WindowsAppSDK package found in winsdk.yaml");
-            }
-            return null;
-        }
-
-        if (verbose)
-        {
-            Console.WriteLine($"📦 Found Windows App SDK main package: v{mainVersion}");
-        }
-
-        // Use PackageCacheService to find the runtime package that was installed with the main package
-        var cacheService = new PackageCacheService();
-        Dictionary<string, string> cachedPackages;
-
-        try
-        {
-            cachedPackages = cacheService.GetCachedPackageAsync("Microsoft.WindowsAppSDK", mainVersion, CancellationToken.None).GetAwaiter().GetResult();
-        }
-        catch (KeyNotFoundException)
-        {
-            if (verbose)
-            {
-                Console.WriteLine($"⚠️  Microsoft.WindowsAppSDK v{mainVersion} not found in package cache");
-            }
-            return null;
-        }
-
+        
         // Look for the runtime package in the cached dependencies
         var runtimePackage = cachedPackages.FirstOrDefault(kvp =>
             kvp.Key.StartsWith("Microsoft.WindowsAppSDK.Runtime", StringComparison.OrdinalIgnoreCase));
@@ -1272,6 +1469,56 @@ $1",
         return msixDir;
     }
 
+    private static (Dictionary<string, string>? CachedPackages, string? MainVersion) GetCachedPackages(bool verbose)
+    {
+        // Load the locked config to get the actual package versions
+        var configService = new ConfigService(Directory.GetCurrentDirectory());
+        if (!configService.Exists())
+        {
+            if (verbose)
+            {
+                Console.WriteLine("⚠️  No winsdk.yaml found, cannot determine locked Windows App SDK version");
+            }
+
+            return (null, null);
+        }
+
+        var config = configService.Load();
+
+        // Get the main Windows App SDK version from config
+        var mainVersion = config.GetVersion("Microsoft.WindowsAppSDK");
+        if (string.IsNullOrEmpty(mainVersion))
+        {
+            if (verbose)
+            {
+                Console.WriteLine("⚠️  No Microsoft.WindowsAppSDK package found in winsdk.yaml");
+            }
+            return (null, null);
+        }
+
+        if (verbose)
+        {
+            Console.WriteLine($"📦 Found Windows App SDK main package: v{mainVersion}");
+        }
+
+        // Use PackageCacheService to find the runtime package that was installed with the main package
+        var cacheService = new PackageCacheService();
+
+        try
+        {
+            return (cacheService.GetCachedPackageAsync("Microsoft.WindowsAppSDK", mainVersion, CancellationToken.None).GetAwaiter().GetResult(), mainVersion);
+        }
+        catch (KeyNotFoundException)
+        {
+            if (verbose)
+            {
+                Console.WriteLine($"⚠️  Microsoft.WindowsAppSDK v{mainVersion} not found in package cache");
+            }
+        }
+
+        return (null, null);
+    }
+
     /// <summary>
     /// Parses the MSIX inventory file to extract Windows App Runtime package information
     /// </summary>
@@ -1284,7 +1531,7 @@ $1",
         {
             // Use the shared inventory parsing logic (synchronous version)
             var packageEntries = WorkspaceSetupService.ParseMsixInventoryAsync(msixDir, verbose, CancellationToken.None).GetAwaiter().GetResult();
-            
+
             if (packageEntries == null || packageEntries.Count == 0)
             {
                 return null;
@@ -1292,7 +1539,7 @@ $1",
 
             // Look for the Windows App Runtime main package (not Framework packages)
             var mainRuntimeEntry = packageEntries
-                .FirstOrDefault(entry => entry.PackageIdentity.StartsWith("Microsoft.WindowsAppRuntime.") && 
+                .FirstOrDefault(entry => entry.PackageIdentity.StartsWith("Microsoft.WindowsAppRuntime.") &&
                                        !entry.PackageIdentity.Contains("Framework"));
 
             if (mainRuntimeEntry != null)
@@ -1303,7 +1550,7 @@ $1",
                 {
                     var runtimeName = identityParts[0];
                     var version = identityParts[1];
-                    
+
                     if (verbose)
                     {
                         Console.WriteLine($"{UiSymbols.Package} Found Windows App Runtime: {runtimeName} v{version}");
@@ -1411,16 +1658,16 @@ $1",
         // Handle AppExtension elements with potential PublicFolder
         var appExtensionPattern = @"<(\w+:)?AppExtension[^>]*>(.*?)</(\w+:)?AppExtension>";
         var appExtensionMatches = Regex.Matches(manifestContent, appExtensionPattern, RegexOptions.IgnoreCase | RegexOptions.Singleline);
-        
+
         foreach (Match appExtMatch in appExtensionMatches)
         {
             var appExtensionElement = appExtMatch.Value; // Full AppExtension element
             var appExtensionContent = appExtMatch.Groups[2].Value; // Content inside AppExtension
-            
+
             // Extract PublicFolder from the AppExtension element attributes
             var publicFolderMatch = Regex.Match(appExtensionElement, @"PublicFolder\s*=\s*[""']([^""']*)[""']", RegexOptions.IgnoreCase);
             var publicFolder = publicFolderMatch.Success ? publicFolderMatch.Groups[1].Value.Trim() : string.Empty;
-            
+
             // Extract file references within this AppExtension
             var internalFilePatterns = new[]
             {
@@ -1474,7 +1721,7 @@ $1",
         {
             var sourceFile = Path.Combine(manifestDir, relativeFilePath);
             var targetFile = Path.Combine(targetDir, relativeFilePath);
-            
+
             if (File.Exists(sourceFile))
             {
                 // Ensure target directory exists
@@ -1594,10 +1841,10 @@ $1",
             throw new InvalidOperationException($"Failed to register sparse package: {ex.Message}", ex);
         }
     }
-    
+
     private void CopyRuntimeFiles(string extractedDir, string deploymentDir, bool verbose)
     {
-        var patterns = new[] { "*.dll", "*.winmd", "*.mui", "*.pri", "*.exe", "*.png", "*.json", "*.html" };
+        var patterns = new[] { "*.dll", "workloads*.json", "restartAgent.exe", "map.html", "*.mui", "*.png", "*.winmd", "*.xaml", "*.xbf", "*.pri" };
 
         foreach (var pattern in patterns)
         {
@@ -1627,7 +1874,11 @@ $1",
     /// <summary>
     /// Prepares Windows App SDK runtime files for packaging into an MSIX by extracting them to the input folder
     /// </summary>
-    private async Task PrepareRuntimeForPackagingAsync(string inputFolder, bool verbose, CancellationToken cancellationToken)
+    /// <param name="inputFolder">The folder where runtime files should be copied</param>
+    /// <param name="verbose">Enable verbose logging</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The path to the self-contained deployment directory</returns>
+    private async Task<string> PrepareRuntimeForPackagingAsync(string inputFolder, bool verbose, CancellationToken cancellationToken)
     {
         var arch = WorkspaceSetupService.GetSystemArchitecture();
 
@@ -1672,5 +1923,7 @@ $1",
         {
             throw new DirectoryNotFoundException($"Runtime files not found at {runtimeSourceDir}");
         }
+
+        return runtimeSourceDir;
     }
 }

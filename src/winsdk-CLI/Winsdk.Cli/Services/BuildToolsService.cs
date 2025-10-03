@@ -19,21 +19,6 @@ internal class BuildToolsService
         _packageService = new PackageInstallationService(_configService);
     }
 
-    private string GetCurrentArchitecture()
-    {
-        var arch = RuntimeInformation.ProcessArchitecture;
-
-        // Map .NET architecture names to BuildTools folder names
-        return arch switch
-        {
-            System.Runtime.InteropServices.Architecture.X64 => "x64",
-            System.Runtime.InteropServices.Architecture.X86 => "x86",
-            System.Runtime.InteropServices.Architecture.Arm64 => "arm64",
-            System.Runtime.InteropServices.Architecture.Arm => "arm64", // Use arm64 as fallback for arm
-            _ => "x64" // Default fallback
-        };
-    }
-
     public static string GetGlobalWinsdkDirectory()
     {
         var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -138,7 +123,7 @@ internal class BuildToolsService
         if (requireArchitecture)
         {
             // For bin paths, need to find architecture directory
-            var currentArch = GetCurrentArchitecture();
+            var currentArch = WorkspaceSetupService.GetSystemArchitecture();
             var archPath = Path.Combine(latestVersion, currentArch);
 
             if (Directory.Exists(archPath))
