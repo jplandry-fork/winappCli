@@ -1,17 +1,17 @@
 using System.Text.RegularExpressions;
 
-namespace Winsdk.Cli;
+namespace Winsdk.Cli.Helpers;
 
-internal sealed class SystemDefaultsService
+internal static class SystemDefaultsHelper
 {
-    public string GetDefaultPackageName(string dir)
+    public static string GetDefaultPackageName(string dir)
     {
         var folder = new DirectoryInfo(dir).Name;
         var normalized = Regex.Replace(folder.Trim(), @"\s+", "-").ToLowerInvariant();
         return string.IsNullOrWhiteSpace(normalized) ? "app" : normalized;
     }
 
-    public string GetDefaultPublisherCN()
+    public static string GetDefaultPublisherCN()
     {
         var user = Environment.UserName;
         if (string.IsNullOrWhiteSpace(user)) user = "Developer";

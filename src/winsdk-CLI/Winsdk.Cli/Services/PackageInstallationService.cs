@@ -1,16 +1,19 @@
+using Winsdk.Cli.Helpers;
+using Winsdk.Cli.Models;
+
 namespace Winsdk.Cli.Services;
 
-internal sealed class PackageInstallationService
+internal sealed class PackageInstallationService : IPackageInstallationService
 {
-    private readonly NugetService _nugetService;
-    private readonly ConfigService _configService;
-    private readonly PackageCacheService _cacheService;
+    private readonly INugetService _nugetService;
+    private readonly IConfigService _configService;
+    private readonly IPackageCacheService _cacheService;
 
-    public PackageInstallationService(ConfigService configService)
+    public PackageInstallationService(IConfigService configService, INugetService nugetService, IPackageCacheService cacheService)
     {
-        _nugetService = new NugetService();
         _configService = configService;
-        _cacheService = new PackageCacheService();
+        _nugetService = nugetService;
+        _cacheService = cacheService;
     }
 
     /// <summary>

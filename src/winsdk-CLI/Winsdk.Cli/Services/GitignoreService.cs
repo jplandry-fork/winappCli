@@ -1,3 +1,5 @@
+using Winsdk.Cli.Helpers;
+
 namespace Winsdk.Cli.Services;
 
 internal static class GitignoreService

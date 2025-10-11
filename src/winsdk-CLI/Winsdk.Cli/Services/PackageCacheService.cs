@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Winsdk.Cli.Helpers;
 
 namespace Winsdk.Cli.Services;
 
@@ -16,14 +17,14 @@ internal partial class PackageCacheJsonContext : JsonSerializerContext
 /// <summary>
 /// Manages a JSON cache of installed packages in the .winsdk/packages folder
 /// </summary>
-internal sealed class PackageCacheService
+internal sealed class PackageCacheService : IPackageCacheService
 {
     private const string CacheFileName = "package-cache.json";
     private readonly string _cacheFilePath;
 
-    public PackageCacheService()
+    public PackageCacheService(IWinsdkDirectoryService directoryService)
     {
-        var globalWinsdkDirectory = BuildToolsService.GetGlobalWinsdkDirectory();
+        var globalWinsdkDirectory = directoryService.GetGlobalWinsdkDirectory();
         var packagesDir = Path.Combine(globalWinsdkDirectory, "packages");
         _cacheFilePath = Path.Combine(packagesDir, CacheFileName);
     }

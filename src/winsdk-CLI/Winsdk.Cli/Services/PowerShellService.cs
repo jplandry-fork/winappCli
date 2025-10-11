@@ -5,7 +5,7 @@ namespace Winsdk.Cli.Services;
 /// <summary>
 /// Service for executing PowerShell commands
 /// </summary>
-internal class PowerShellService
+internal class PowerShellService : IPowerShellService
 {
     /// <summary>
     /// Runs a PowerShell command and returns the exit code and output

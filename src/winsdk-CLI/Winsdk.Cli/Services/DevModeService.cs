@@ -4,7 +4,7 @@ using Microsoft.Win32;
 
 namespace Winsdk.Cli.Services;
 
-internal sealed class DevModeService
+internal sealed class DevModeService : IDevModeService
 {
     public int EnsureWin11DevMode()
     {

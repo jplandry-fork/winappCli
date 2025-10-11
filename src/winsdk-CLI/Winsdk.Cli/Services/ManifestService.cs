@@ -1,8 +1,9 @@
 using System.Text.RegularExpressions;
+using Winsdk.Cli.Helpers;
 
 namespace Winsdk.Cli.Services;
 
-internal class ManifestService
+internal class ManifestService : IManifestService
 {
     public async Task GenerateManifestAsync(
         string directory, 
@@ -30,9 +31,8 @@ internal class ManifestService
         }
 
         // Interactive mode if not --yes (get defaults for prompts)
-        var defaults = new SystemDefaultsService();
-        packageName ??= defaults.GetDefaultPackageName(directory);
-        publisherName ??= defaults.GetDefaultPublisherCN();
+        packageName ??= SystemDefaultsHelper.GetDefaultPackageName(directory);
+        publisherName ??= SystemDefaultsHelper.GetDefaultPublisherCN();
         executable ??= $"{packageName}.exe";
 
         // Interactive mode if not --yes
@@ -91,6 +91,9 @@ internal class ManifestService
         // ST_AllowedAsciiCharSet pattern="[-_. A-Za-z0-9]+"
         cleaned = Regex.Replace(cleaned, @"[^A-Za-z0-9\-_. ]", "");
 
+        // Check if it starts with underscore BEFORE removing them
+        bool startsWithUnderscore = cleaned.StartsWith('_');
+
         // Remove leading underscores (ST_AsciiIdentifier restriction)
         cleaned = cleaned.TrimStart('_');
 
@@ -98,6 +101,12 @@ internal class ManifestService
         if (string.IsNullOrWhiteSpace(cleaned))
         {
             cleaned = "DefaultPackage";
+        }
+
+        // If originally started with underscore, prepend "App"
+        if (startsWithUnderscore)
+        {
+            cleaned = "App" + cleaned;
         }
 
         // Ensure minimum length of 3 characters
@@ -110,12 +119,6 @@ internal class ManifestService
         if (cleaned.Length > 50)
         {
             cleaned = cleaned.Substring(0, 50).TrimEnd(); // Trim end in case we cut off mid-word
-        }
-
-        // Final check: ensure it doesn't start with underscore after all transformations
-        if (cleaned.StartsWith('_'))
-        {
-            cleaned = string.Concat("App", cleaned.AsSpan(1));
         }
 
         return cleaned;

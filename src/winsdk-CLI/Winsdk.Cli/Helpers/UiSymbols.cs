@@ -1,4 +1,4 @@
-namespace Winsdk.Cli;
+namespace Winsdk.Cli.Helpers;
 
 internal static class UiSymbols
 {

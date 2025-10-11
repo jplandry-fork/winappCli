@@ -28,7 +28,16 @@ jobs:
     # Build the CLI solution and publish the CLI binaries for both x64 and ARM64 architectures
     - name: Build CLI solution
       run: dotnet build src\winsdk-CLI\winsdk.sln -c Release
-    # Todo: Add tests
+
+    - name: Run tests
+      run: dotnet test src\winsdk-CLI\winsdk.sln -c Release --results-directory .\TestResults -- --report-trx
+    - name: Upload test results
+      if: ${{ !cancelled() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: .\**\TestResults\*.trx
+
     - name: Publish CLI for x64
       run: dotnet publish src\winsdk-CLI\Winsdk.Cli\Winsdk.Cli.csproj -c Release -r win-x64 --self-contained
     - name: Publish CLI for ARM64

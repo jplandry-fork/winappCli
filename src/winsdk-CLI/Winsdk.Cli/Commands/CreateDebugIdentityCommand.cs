@@ -1,46 +1,55 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
+using Winsdk.Cli.Services;
 
 namespace Winsdk.Cli.Commands;
 
 internal class CreateDebugIdentityCommand : Command
 {
-    public CreateDebugIdentityCommand() : base("create-debug-identity", "Create and install a temporary package for debugging. Must be called every time the appxmanifest.xml is modified for changes to take effect.")
+    public static Argument<string> ExecutableArgument { get; }
+    public static Option<string> ManifestOption { get; }
+    public static Option<bool> NoInstallOption { get; }
+    public static Option<string> LocationOption { get; }
+
+    static CreateDebugIdentityCommand()
     {
-        var executableArgument = new Argument<string>("executable")
+        ExecutableArgument = new Argument<string>("executable")
         {
             Description = "Path to the .exe that will need to run with identity"
         };
-        var manifestOption = new Option<string>("--manifest")
+        ManifestOption = new Option<string>("--manifest")
         {
             Description = "Path to the appxmanifest.xml",
             DefaultValueFactory = (argumentResult) => ".\\appxmanifest.xml"
         };
-        var noInstallOption = new Option<bool>("--no-install")
+        NoInstallOption = new Option<bool>("--no-install")
         {
             Description = "Do not install the package after creation."
         };
-        var locationOption = new Option<string>("--location")
+        LocationOption = new Option<string>("--location")
         {
             Description = "Root path of the application. Default is parent directory of the executable."
         };
+    }
 
-        Arguments.Add(executableArgument);
-        Options.Add(manifestOption);
-        Options.Add(noInstallOption);
-        Options.Add(locationOption);
-        Options.Add(Program.VerboseOption);
+    public CreateDebugIdentityCommand() : base("create-debug-identity", "Create and install a temporary package for debugging. Must be called every time the appxmanifest.xml is modified for changes to take effect.")
+    {
+        Arguments.Add(ExecutableArgument);
+        Options.Add(ManifestOption);
+        Options.Add(NoInstallOption);
+        Options.Add(LocationOption);
+        Options.Add(WinSdkRootCommand.VerboseOption);
+    }
 
-        SetAction(async (parseResult, ct) =>
+    public class Handler(IMsixService msixService) : AsynchronousCommandLineAction
+    {
+        public override async Task<int> InvokeAsync(ParseResult parseResult, CancellationToken cancellationToken = default)
         {
-            var executablePath = parseResult.GetRequiredValue(executableArgument);
-            var manifest = parseResult.GetRequiredValue(manifestOption);
-            var noInstall = parseResult.GetValue(noInstallOption);
-            var location = parseResult.GetValue(locationOption);
-            var verbose = parseResult.GetValue(Program.VerboseOption);
-
-            var configService = new ConfigService(Directory.GetCurrentDirectory());
-            var buildToolsService = new BuildToolsService(configService);
-            var msixService = new MsixService(buildToolsService);
+            var executablePath = parseResult.GetRequiredValue(ExecutableArgument);
+            var manifest = parseResult.GetRequiredValue(ManifestOption);
+            var noInstall = parseResult.GetValue(NoInstallOption);
+            var location = parseResult.GetValue(LocationOption);
+            var verbose = parseResult.GetValue(WinSdkRootCommand.VerboseOption);
 
             if (!File.Exists(executablePath))
             {
@@ -50,7 +59,7 @@ internal class CreateDebugIdentityCommand : Command
 
             try
             {
-                var result = await msixService.AddMsixIdentityToExeAsync(executablePath, manifest, noInstall, location, verbose, ct);
+                var result = await msixService.AddMsixIdentityToExeAsync(executablePath, manifest, noInstall, location, verbose, cancellationToken);
 
                 Console.WriteLine("✅ MSIX identity added successfully!");
                 Console.WriteLine($"📦 Package: {result.PackageName}");
@@ -64,6 +73,6 @@ internal class CreateDebugIdentityCommand : Command
             }
 
             return 0;
-        });
+        }
     }
 }

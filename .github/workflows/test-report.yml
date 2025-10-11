@@ -1,0 +1,22 @@
+name: 'Test Report'
+on:
+  workflow_run:
+    workflows: ['Build'] # runs after Build workflow
+    types:
+      - completed
+permissions:
+  contents: read
+  actions: read
+  checks: write
+jobs:
+  report:
+    name: Test
+    runs-on: windows-latest
+    steps:
+    - name: Display test results
+      uses: dorny/test-reporter@v2
+      with:
+        artifact: test-results
+        name: Test - Results
+        path: '**/*.trx'
+        reporter: dotnet-trx

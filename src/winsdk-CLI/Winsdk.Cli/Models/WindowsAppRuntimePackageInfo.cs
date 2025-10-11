@@ -1,4 +1,4 @@
-namespace Winsdk.Cli.Services;
+namespace Winsdk.Cli.Models;
 
 /// <summary>
 /// Information about a Windows App Runtime package from the MSIX inventory

@@ -1,4 +1,4 @@
-namespace Winsdk.Cli;
+namespace Winsdk.Cli.Models;
 
 internal sealed class PackagePin
 {

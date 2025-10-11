@@ -6,7 +6,7 @@ namespace Winsdk.Cli.Services;
 /// <summary>
 /// Shared service for manifest template operations and utilities
 /// </summary>
-internal class ManifestTemplateService
+internal static class ManifestTemplateService
 {
     private static readonly char[] WordSeparators = [' ', '-', '_'];
 

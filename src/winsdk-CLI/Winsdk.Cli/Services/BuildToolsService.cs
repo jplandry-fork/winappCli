@@ -1,51 +1,24 @@
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
-using Winsdk.Cli.Services;
+using Winsdk.Cli.Helpers;
+using Winsdk.Cli.Models;
 
-namespace Winsdk.Cli;
+namespace Winsdk.Cli.Services;
 
-internal class BuildToolsService
+internal class BuildToolsService : IBuildToolsService
 {
     internal const string BUILD_TOOLS_PACKAGE = "Microsoft.Windows.SDK.BuildTools";
     internal const string CPP_SDK_PACKAGE = "Microsoft.Windows.SDK.CPP";
 
-    private readonly ConfigService _configService;
-    private readonly PackageInstallationService _packageService;
+    private readonly IConfigService _configService;
+    private readonly IWinsdkDirectoryService _winsdkDirectoryService;
+    private readonly IPackageInstallationService _packageInstallationService;
 
-    public BuildToolsService(ConfigService configService)
+    public BuildToolsService(IConfigService configService, IWinsdkDirectoryService winsdkDirectoryService, IPackageInstallationService packageInstallationService)
     {
         _configService = configService;
-        _packageService = new PackageInstallationService(_configService);
-    }
-
-    public static string GetGlobalWinsdkDirectory()
-    {
-        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var winsdkDir = Path.Combine(userProfile, ".winsdk");
-        return winsdkDir;
-    }
-
-    public string GetLocalWinsdkDirectory(string? baseDirectoryStr = null)
-    {
-        if (string.IsNullOrEmpty(baseDirectoryStr))
-        {
-            baseDirectoryStr = Directory.GetCurrentDirectory();
-        }
-
-        var originalBaseDir = new DirectoryInfo(baseDirectoryStr);
-        var baseDirectory = originalBaseDir;
-        while (baseDirectory != null)
-        {
-            var winsdkDirectory = Path.Combine(baseDirectory.FullName, ".winsdk");
-            if (Directory.Exists(winsdkDirectory))
-            {
-                return winsdkDirectory;
-            }
-            baseDirectory = baseDirectory.Parent;
-        }
-
-        return Path.Combine(originalBaseDir.FullName, ".winsdk");
+        _winsdkDirectoryService = winsdkDirectoryService;
+        _packageInstallationService = packageInstallationService;
     }
 
     /// <summary>
@@ -58,7 +31,7 @@ internal class BuildToolsService
     /// <returns>Full path to the requested location, or null if not found</returns>
     private string? FindPackagePath(string packageName, string subPath, string? finalSubPath = null, bool requireArchitecture = false)
     {
-        var winsdkDir = GetGlobalWinsdkDirectory();
+        var winsdkDir = _winsdkDirectoryService.GetGlobalWinsdkDirectory();
         var packagesDir = Path.Combine(winsdkDir, "packages");
         if (!Directory.Exists(packagesDir))
             return null;
@@ -183,28 +156,13 @@ internal class BuildToolsService
     }
 
     /// <summary>
-    /// Get the path to the schemas directory in BuildTools
-    /// </summary>
-    /// <returns>Path to the schemas directory if found, null otherwise</returns>
-    public string? GetSchemasPath()
-    {
-        return FindPackagePath(BUILD_TOOLS_PACKAGE, "schemas", "winrt");
-    }
-
-    // get Microsoft.Windows.SDK.CPP.10.0.26100.4948\c\Include\10.0.26100.0\winrt path
-    public string? GetCppSDKIncludesPath()
-    {
-        return FindPackagePath(CPP_SDK_PACKAGE, Path.Join("c", "Include"));
-    }
-
-    /// <summary>
     /// Get the full path to a specific BuildTools executable
     /// </summary>
     /// <param name="toolName">Name of the tool (e.g., 'mt.exe', 'signtool.exe')</param>
     /// <returns>Full path to the executable</returns>
     public string? GetBuildToolPath(string toolName)
     {
-        var winsdkDir = GetGlobalWinsdkDirectory();
+        var winsdkDir = _winsdkDirectoryService.GetGlobalWinsdkDirectory();
         if (winsdkDir == null)
             return null;
 
@@ -248,9 +206,9 @@ internal class BuildToolsService
             Console.WriteLine($"{UiSymbols.Wrench} {actionMessage} {BUILD_TOOLS_PACKAGE}{versionInfo}...");
         }
 
-        var winsdkDir = GetGlobalWinsdkDirectory();
+        var winsdkDir = _winsdkDirectoryService.GetGlobalWinsdkDirectory();
 
-        var success = await _packageService.EnsurePackageAsync(
+        var success = await _packageInstallationService.EnsurePackageAsync(
             winsdkDir,
             BUILD_TOOLS_PACKAGE,
             version: pinnedVersion,

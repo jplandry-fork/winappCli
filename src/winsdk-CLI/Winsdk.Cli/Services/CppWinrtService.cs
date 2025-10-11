@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using System.Text;
 
-namespace Winsdk.Cli;
+namespace Winsdk.Cli.Services;
 
-internal sealed class CppWinrtService
+internal sealed class CppWinrtService : ICppWinrtService
 {
     public string? FindCppWinrtExe(string packagesDir, IDictionary<string, string> usedVersions)
     {

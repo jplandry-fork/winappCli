@@ -1,13 +1,15 @@
 using System.Text;
+using Winsdk.Cli.Models;
 
-namespace Winsdk.Cli;
+namespace Winsdk.Cli.Services;
 
-internal sealed class ConfigService
+internal sealed class ConfigService : IConfigService
 {
-    public string ConfigPath { get; }
+    public string ConfigPath { get; set; }
 
-    public ConfigService(string workingDir)
+    public ConfigService()
     {
+        var workingDir = Directory.GetCurrentDirectory();
         ConfigPath = Path.Combine(workingDir, "winsdk.yaml");
     }
 

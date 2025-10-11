@@ -1,52 +1,59 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using Winsdk.Cli.Services;
 
 namespace Winsdk.Cli.Commands;
 
 internal class SignCommand : Command
 {
-    private readonly CertificateServices _certificateService;
+    public static Argument<string> FilePathArgument { get; }
+    public static Argument<string> CertPathArgument { get; }
+    public static Option<string> PasswordOption { get; }
+    public static Option<string> TimestampOption { get; }
 
-    public SignCommand() : base("sign", "Sign a file/package with a certificate")
+    static SignCommand()
     {
-        var configService = new ConfigService(Directory.GetCurrentDirectory());
-        var buildToolsService = new BuildToolsService(configService);
-        _certificateService = new CertificateServices(buildToolsService);
-        var filePathArgument = new Argument<string>("file-path")
+        FilePathArgument = new Argument<string>("file-path")
         {
             Description = "Path to the file/package to sign"
         };
-        var certPathArgument = new Argument<string>("cert-path")
+        CertPathArgument = new Argument<string>("cert-path")
         {
             Description = "Path to the certificate file (PFX format)"
         };
-        var passwordOption = new Option<string>("--password")
+        PasswordOption = new Option<string>("--password")
         {
             Description = "Certificate password",
             DefaultValueFactory = (argumentResult) => "password"
         };
-        var timestampOption = new Option<string>("--timestamp")
+        TimestampOption = new Option<string>("--timestamp")
         {
             Description = "Timestamp server URL"
         };
+    }
 
-        Arguments.Add(filePathArgument);
-        Arguments.Add(certPathArgument);
-        Options.Add(passwordOption);
-        Options.Add(timestampOption);
-        Options.Add(Program.VerboseOption);
+    public SignCommand() : base("sign", "Sign a file/package with a certificate")
+    {
+        Arguments.Add(FilePathArgument);
+        Arguments.Add(CertPathArgument);
+        Options.Add(PasswordOption);
+        Options.Add(TimestampOption);
+        Options.Add(WinSdkRootCommand.VerboseOption);
+    }
 
-        SetAction(async (parseResult, ct) =>
+    public class Handler(ICertificateService certificateService) : AsynchronousCommandLineAction
+    {
+        public override async Task<int> InvokeAsync(ParseResult parseResult, CancellationToken cancellationToken = default)
         {
-            var filePath = parseResult.GetRequiredValue(filePathArgument);
-            var certPath = parseResult.GetRequiredValue(certPathArgument);
-            var password = parseResult.GetValue(passwordOption);
-            var timestamp = parseResult.GetValue(timestampOption);
-            var verbose = parseResult.GetValue(Program.VerboseOption);
+            var filePath = parseResult.GetRequiredValue(FilePathArgument);
+            var certPath = parseResult.GetRequiredValue(CertPathArgument);
+            var password = parseResult.GetValue(PasswordOption);
+            var timestamp = parseResult.GetValue(TimestampOption);
+            var verbose = parseResult.GetValue(WinSdkRootCommand.VerboseOption);
 
             try
             {
-                await _certificateService.SignFileAsync(filePath, certPath, password, timestamp, verbose, ct);
+                await certificateService.SignFileAsync(filePath, certPath, password, timestamp, verbose, cancellationToken);
 
                 Console.WriteLine($"🔐 Signed file: {filePath}");
                 return 0;
@@ -56,6 +63,6 @@ internal class SignCommand : Command
                 Console.Error.WriteLine($"❌ Failed to sign file: {error.Message}");
                 return 1;
             }
-        });
+        }
     }
 }

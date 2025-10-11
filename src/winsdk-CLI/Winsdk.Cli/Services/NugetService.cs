@@ -1,9 +1,10 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Winsdk.Cli.Helpers;
 
-namespace Winsdk.Cli;
+namespace Winsdk.Cli.Services;
 
-internal class NugetService
+internal class NugetService : INugetService
 {
     private static readonly HttpClient Http = new();
     private const string NugetExeUrl = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe";

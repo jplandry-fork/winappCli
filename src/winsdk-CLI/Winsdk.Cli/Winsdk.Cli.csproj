@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -27,17 +27,20 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- No external CLI deps; using lightweight manual parsing for NativeAOT-friendliness -->
-  </ItemGroup>
-
-  <ItemGroup>
     <!-- Embed templates and default MSIX assets -->
     <EmbeddedResource Include="Templates\**\*.*" />
     <EmbeddedResource Include="Assets\msix_default_assets\**\*.*" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.9" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-rc.1.25451.107" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Winsdk.Cli.Tests</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 
 </Project>

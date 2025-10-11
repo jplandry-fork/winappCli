@@ -3,19 +3,30 @@ using System.Security;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
-using Winsdk.Cli.Services;
+using Winsdk.Cli.Helpers;
+using Winsdk.Cli.Models;
 
-namespace Winsdk.Cli;
+namespace Winsdk.Cli.Services;
 
-internal class MsixService
+internal class MsixService : IMsixService
 {
-    private readonly BuildToolsService _buildToolsService;
-    private readonly PowerShellService _powerShellService;
+    private readonly IWinsdkDirectoryService _winsdkDirectoryService;
+    private readonly IConfigService _configService;
+    private readonly IBuildToolsService _buildToolsService;
+    private readonly IPowerShellService _powerShellService;
+    private readonly ICertificateService _certificateService;
+    private readonly IPackageCacheService _packageCacheService;
+    private readonly IWorkspaceSetupService _workspaceSetupService;
 
-    public MsixService(BuildToolsService buildToolsService)
+    public MsixService(IWinsdkDirectoryService winsdkDirectoryService, IConfigService configService, IBuildToolsService buildToolsService, IPowerShellService powerShellService, ICertificateService certificateService, IPackageCacheService packageCacheService, IWorkspaceSetupService workspaceSetupService)
     {
+        _winsdkDirectoryService = winsdkDirectoryService;
+        _configService = configService;
         _buildToolsService = buildToolsService;
-        _powerShellService = new PowerShellService();
+        _powerShellService = powerShellService;
+        _certificateService = certificateService;
+        _packageCacheService = packageCacheService;
+        _workspaceSetupService = workspaceSetupService;
     }
 
     /// <summary>
@@ -136,7 +147,7 @@ internal class MsixService
     /// <returns>MsixIdentityResult containing package name, publisher, and application ID</returns>
     /// <exception cref="FileNotFoundException">Thrown when the manifest file is not found</exception>
     /// <exception cref="InvalidOperationException">Thrown when the manifest is invalid or missing required elements</exception>
-    public async Task<MsixIdentityResult> ParseAppxManifestFromPathAsync(string appxManifestPath, CancellationToken cancellationToken = default)
+    public static async Task<MsixIdentityResult> ParseAppxManifestFromPathAsync(string appxManifestPath, CancellationToken cancellationToken = default)
     {
         if (!File.Exists(appxManifestPath))
             throw new FileNotFoundException($"AppX manifest not found at: {appxManifestPath}");
@@ -153,7 +164,7 @@ internal class MsixService
     /// <param name="appxManifestContent">The content of the appxmanifest.xml file</param>
     /// <returns>MsixIdentityResult containing package name, publisher, and application ID</returns>
     /// <exception cref="InvalidOperationException">Thrown when the manifest is invalid or missing required elements</exception>
-    public MsixIdentityResult ParseAppxManifestAsync(string appxManifestContent)
+    public static MsixIdentityResult ParseAppxManifestAsync(string appxManifestContent)
     {
         // Extract Package Identity information
         var identityMatch = Regex.Match(appxManifestContent, @"<Identity[^>]*>", RegexOptions.IgnoreCase);
@@ -799,9 +810,9 @@ internal class MsixService
         }
     }
 
-    private static IEnumerable<string> GetComponents(Dictionary<string, string> cachedPackages)
+    private IEnumerable<string> GetComponents(Dictionary<string, string> cachedPackages)
     {
-        var winsdkDir = BuildToolsService.GetGlobalWinsdkDirectory();
+        var winsdkDir = _winsdkDirectoryService.GetGlobalWinsdkDirectory();
         var packagesDir = Path.Combine(winsdkDir, "packages");
         if (!Directory.Exists(packagesDir))
         {
@@ -979,8 +990,6 @@ internal class MsixService
 
     private async Task SignMsixPackageAsync(string outputFolder, string certificatePassword, bool generateDevCert, bool installDevCert, bool verbose, string finalPackageName, string? extractedPublisher, string outputMsixPath, string? certPath, CancellationToken cancellationToken)
     {
-        var certificateService = new CertificateServices(_buildToolsService);
-
         if (string.IsNullOrWhiteSpace(certPath) && generateDevCert)
         {
             if (string.IsNullOrWhiteSpace(extractedPublisher))
@@ -992,7 +1001,7 @@ internal class MsixService
             }
 
             certPath = Path.Combine(outputFolder, $"{finalPackageName}_cert.pfx");
-            await certificateService.GenerateDevCertificateAsync(extractedPublisher, certPath, certificatePassword, verbose: verbose, cancellationToken: cancellationToken);
+            await _certificateService.GenerateDevCertificateAsync(extractedPublisher, certPath, certificatePassword, verbose: verbose, cancellationToken: cancellationToken);
         }
 
         if (string.IsNullOrWhiteSpace(certPath))
@@ -1001,11 +1010,11 @@ internal class MsixService
         // Install certificate if requested
         if (installDevCert)
         {
-            var result = await certificateService.InstallCertificateAsync(certPath, certificatePassword, false, verbose, cancellationToken);
+            var result = await _certificateService.InstallCertificateAsync(certPath, certificatePassword, false, verbose, cancellationToken);
         }
 
         // Sign the package
-        await certificateService.SignFileAsync(outputMsixPath, certPath, certificatePassword, verbose: verbose, cancellationToken: cancellationToken);
+        await _certificateService.SignFileAsync(outputMsixPath, certPath, certificatePassword, verbose: verbose, cancellationToken: cancellationToken);
     }
 
     private async Task CreateMsixPackageFromFolderAsync(string inputFolder, bool verbose, string outputMsixPath, CancellationToken cancellationToken)
@@ -1023,7 +1032,7 @@ internal class MsixService
 
     private async Task RunMtToolAsync(string arguments, bool verbose, CancellationToken cancellationToken = default)
     {
-        // Use the new BuildToolsService to run mt.exe
+        // Use BuildToolsService to run mt.exe
         await _buildToolsService.RunBuildToolAsync("mt.exe", arguments, verbose, cancellationToken: cancellationToken);
     }
 
@@ -1416,7 +1425,7 @@ $1",
         }
     }
 
-    private static string? GetRuntimeMsixDir(bool verbose)
+    private string? GetRuntimeMsixDir(bool verbose)
     {
         (var cachedPackages, var mainVersion) = GetCachedPackages(verbose);
         if (cachedPackages == null || mainVersion == null)
@@ -1456,7 +1465,7 @@ $1",
         }
 
         // Find the MSIX directory with the runtime package
-        var msixDir = WorkspaceSetupService.FindWindowsAppSdkMsixDirectory(usedVersions);
+        var msixDir = _workspaceSetupService.FindWindowsAppSdkMsixDirectory(usedVersions);
         if (msixDir == null)
         {
             if (verbose)
@@ -1469,11 +1478,10 @@ $1",
         return msixDir;
     }
 
-    private static (Dictionary<string, string>? CachedPackages, string? MainVersion) GetCachedPackages(bool verbose)
+    private (Dictionary<string, string>? CachedPackages, string? MainVersion) GetCachedPackages(bool verbose)
     {
         // Load the locked config to get the actual package versions
-        var configService = new ConfigService(Directory.GetCurrentDirectory());
-        if (!configService.Exists())
+        if (!_configService.Exists())
         {
             if (verbose)
             {
@@ -1483,7 +1491,7 @@ $1",
             return (null, null);
         }
 
-        var config = configService.Load();
+        var config = _configService.Load();
 
         // Get the main Windows App SDK version from config
         var mainVersion = config.GetVersion("Microsoft.WindowsAppSDK");
@@ -1501,12 +1509,10 @@ $1",
             Console.WriteLine($"📦 Found Windows App SDK main package: v{mainVersion}");
         }
 
-        // Use PackageCacheService to find the runtime package that was installed with the main package
-        var cacheService = new PackageCacheService();
-
         try
         {
-            return (cacheService.GetCachedPackageAsync("Microsoft.WindowsAppSDK", mainVersion, CancellationToken.None).GetAwaiter().GetResult(), mainVersion);
+            // Use PackageCacheService to find the runtime package that was installed with the main package
+            return (_packageCacheService.GetCachedPackageAsync("Microsoft.WindowsAppSDK", mainVersion, CancellationToken.None).GetAwaiter().GetResult(), mainVersion);
         }
         catch (KeyNotFoundException)
         {

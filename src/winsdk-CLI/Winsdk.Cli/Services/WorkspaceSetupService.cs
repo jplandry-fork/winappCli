@@ -1,4 +1,6 @@
 using System.Runtime.InteropServices;
+using Winsdk.Cli.Helpers;
+using Winsdk.Cli.Models;
 
 namespace Winsdk.Cli.Services;
 
@@ -24,24 +26,54 @@ internal class WorkspaceSetupOptions
 /// <summary>
 /// Shared service for setting up winsdk workspaces
 /// </summary>
-internal class WorkspaceSetupService
+internal class WorkspaceSetupService : IWorkspaceSetupService
 {
-    public WorkspaceSetupService()
+    private readonly IConfigService _configService;
+    private readonly IWinsdkDirectoryService _winsdkDirectoryService;
+    private readonly IPackageInstallationService _packageService;
+    private readonly IBuildToolsService _buildToolsService;
+    private readonly ICppWinrtService _cppwinrtService;
+    private readonly IPackageLayoutService _packageLayoutService;
+    private readonly ICertificateService _certificateService;
+    private readonly IPowerShellService _powerShellService;
+    private readonly INugetService _nugetService;
+    private readonly IManifestService _manifestService;
+    private readonly IDevModeService _devModeService;
+
+    public WorkspaceSetupService(
+        IConfigService configService,
+        IWinsdkDirectoryService winsdkDirectoryService,
+        IPackageInstallationService packageInstallationService,
+        IBuildToolsService buildToolsService,
+        ICppWinrtService cppWinrtService,
+        IPackageLayoutService packageLayoutService,
+        ICertificateService certificateService,
+        IPowerShellService powerShellService,
+        INugetService nugetService,
+        IManifestService manifestService,
+        IDevModeService devModeService)
     {
+        _configService = configService;
+        _winsdkDirectoryService = winsdkDirectoryService;
+        _packageService = packageInstallationService;
+        _buildToolsService = buildToolsService;
+        _cppwinrtService = cppWinrtService;
+        _packageLayoutService = packageLayoutService;
+        _certificateService = certificateService;
+        _powerShellService = powerShellService;
+        _nugetService = nugetService;
+        _manifestService = manifestService;
+        _devModeService = devModeService;
     }
 
     public async Task<int> SetupWorkspaceAsync(WorkspaceSetupOptions options, CancellationToken cancellationToken = default)
     {
+        _configService.ConfigPath = Path.Combine(options.ConfigDir, "winsdk.yaml");
+
         try
         {
-            var configService = new ConfigService(options.ConfigDir);
-            var buildToolsService = new BuildToolsService(configService);
-            var packageService = new PackageInstallationService(configService);
-            var cppwinrtService = new CppWinrtService();
-            var layoutService = new PackageLayoutService();
-
             // Step 1: Handle configuration requirements
-            if (options.RequireExistingConfig && !configService.Exists())
+            if (options.RequireExistingConfig && !_configService.Exists())
             {
                 Console.Error.WriteLine($"winsdk.yaml not found in {options.ConfigDir}");
                 Console.Error.WriteLine($"Run 'winsdk setup' to initialize a new workspace or navigate to a directory with winsdk.yaml");
@@ -50,11 +82,11 @@ internal class WorkspaceSetupService
 
             // Step 2: Load or prepare configuration
             WinsdkConfig config;
-            bool hadExistingConfig = configService.Exists();
+            bool hadExistingConfig = _configService.Exists();
             
             if (hadExistingConfig)
             {
-                config = configService.Load();
+                config = _configService.Load();
                 
                 if (config.Packages.Count == 0 && options.RequireExistingConfig)
                 {
@@ -102,7 +134,7 @@ internal class WorkspaceSetupService
                 {
                     if (!options.Quiet)
                     {
-                        Console.WriteLine($"{UiSymbols.Check} Existing configuration file found and validated → {configService.ConfigPath}");
+                        Console.WriteLine($"{UiSymbols.Check} Existing configuration file found and validated → {_configService.ConfigPath}");
                         Console.WriteLine($"{UiSymbols.Package} Configuration contains {config.Packages.Count} packages");
                         
                         if (options.Verbose && config.Packages.Count > 0)
@@ -118,8 +150,6 @@ internal class WorkspaceSetupService
                 else
                 {
                     // Generate config with default package versions
-                    var nugetService = new NugetService();
-                    
                     if (!options.Quiet)
                     {
                         Console.WriteLine($"{UiSymbols.New} Creating configuration file with default SDK packages...");
@@ -131,7 +161,7 @@ internal class WorkspaceSetupService
                     {
                         try
                         {
-                            var version = await nugetService.GetLatestVersionAsync(
+                            var version = await _nugetService.GetLatestVersionAsync(
                                 packageName, 
                                 includePrerelease: options.IncludeExperimental,
                                 cancellationToken: cancellationToken);
@@ -151,12 +181,12 @@ internal class WorkspaceSetupService
                     {
                         finalConfig.SetVersion(kvp.Key, kvp.Value);
                     }
-                    
-                    configService.Save(finalConfig);
+
+                    _configService.Save(finalConfig);
                     
                     if (!options.Quiet)
                     {
-                        Console.WriteLine($"{UiSymbols.Save} Configuration file created → {configService.ConfigPath}");
+                        Console.WriteLine($"{UiSymbols.Save} Configuration file created → {_configService.ConfigPath}");
                         Console.WriteLine($"{UiSymbols.Package} Added {finalConfig.Packages.Count} default SDK packages");
                         
                         if (options.Verbose)
@@ -180,13 +210,13 @@ internal class WorkspaceSetupService
             }
 
             // Step 3: Initialize workspace
-            var globalWinsdkDir = BuildToolsService.GetGlobalWinsdkDirectory();
-            var localWinsdkDir = buildToolsService.GetLocalWinsdkDirectory(options.BaseDirectory);
-            
+            var globalWinsdkDir = _winsdkDirectoryService.GetGlobalWinsdkDirectory();
+            var localWinsdkDir = _winsdkDirectoryService.GetLocalWinsdkDirectory(options.BaseDirectory);
+
             // Setup-specific startup messages
             if (!options.RequireExistingConfig && !options.Quiet)
             {
-                Console.WriteLine($"{UiSymbols.Rocket} using config → {configService.ConfigPath}");
+                Console.WriteLine($"{UiSymbols.Rocket} using config → {_configService.ConfigPath}");
                 Console.WriteLine($"{UiSymbols.Rocket} winsdk init starting in {options.BaseDirectory}");
                 Console.WriteLine($"{UiSymbols.Folder} Global packages → {globalWinsdkDir}");
                 Console.WriteLine($"{UiSymbols.Folder} Local workspace → {localWinsdkDir}");
@@ -203,13 +233,13 @@ internal class WorkspaceSetupService
             }
 
             // First ensure basic workspace (for global packages)
-            packageService.InitializeWorkspace(globalWinsdkDir);
+            _packageService.InitializeWorkspace(globalWinsdkDir);
 
             if (!options.Quiet)
             {
                 if (!options.RequireExistingConfig)
                 {
-                    Console.WriteLine($"{UiSymbols.Rocket} using config → {configService.ConfigPath}");
+                    Console.WriteLine($"{UiSymbols.Rocket} using config → {_configService.ConfigPath}");
                     Console.WriteLine($"{UiSymbols.Rocket} winsdk init starting in {options.BaseDirectory}");
                 }
                 Console.WriteLine($"{UiSymbols.Folder} Global packages → {globalWinsdkDir}");
@@ -242,7 +272,7 @@ internal class WorkspaceSetupService
             {
                 // Restore: use packages from existing config
                 var packageNames = config.Packages.Select(p => p.Name).ToArray();
-                usedVersions = await packageService.InstallPackagesAsync(
+                usedVersions = await _packageService.InstallPackagesAsync(
                     globalWinsdkDir,
                     packageNames,
                     includeExperimental: options.IncludeExperimental,
@@ -253,7 +283,7 @@ internal class WorkspaceSetupService
             else
             {
                 // Setup: install standard SDK packages
-                usedVersions = await packageService.InstallPackagesAsync(
+                usedVersions = await _packageService.InstallPackagesAsync(
                     globalWinsdkDir,
                     NugetService.SDK_PACKAGES,
                     includeExperimental: options.IncludeExperimental,
@@ -263,7 +293,7 @@ internal class WorkspaceSetupService
             }
 
             // Step 5: Run cppwinrt and set up projections
-            var cppWinrtExe = cppwinrtService.FindCppWinrtExe(pkgsDir, usedVersions);
+            var cppWinrtExe = _cppwinrtService.FindCppWinrtExe(pkgsDir, usedVersions);
             if (cppWinrtExe is null)
             {
                 Console.Error.WriteLine("cppwinrt.exe not found in installed packages.");
@@ -280,7 +310,7 @@ internal class WorkspaceSetupService
             {
                 Console.WriteLine($"{UiSymbols.Files} Copying headers → {includeOut}");
             }
-            layoutService.CopyIncludesFromPackages(pkgsDir, includeOut);
+            _packageLayoutService.CopyIncludesFromPackages(pkgsDir, includeOut);
             Console.WriteLine($"{UiSymbols.Check} Headers ready → {includeOut}");
 
             var libRoot = Path.Combine(localWinsdkDir, "lib");
@@ -288,7 +318,7 @@ internal class WorkspaceSetupService
             {
                 Console.WriteLine($"{UiSymbols.Books} Copying import libs by arch → {libRoot}");
             }
-            layoutService.CopyLibsAllArch(pkgsDir, libRoot);
+            _packageLayoutService.CopyLibsAllArch(pkgsDir, libRoot);
             var libArchs = Directory.Exists(libRoot) ? string.Join(", ", Directory.EnumerateDirectories(libRoot).Select(Path.GetFileName)) : "(none)";
             Console.WriteLine($"{UiSymbols.Books} Import libs ready for archs: {libArchs}");
 
@@ -297,7 +327,7 @@ internal class WorkspaceSetupService
             {
                 Console.WriteLine($"{UiSymbols.Gear} Copying runtime binaries by arch → {binRoot}");
             }
-            layoutService.CopyRuntimesAllArch(pkgsDir, binRoot);
+            _packageLayoutService.CopyRuntimesAllArch(pkgsDir, binRoot);
             var binArchs = Directory.Exists(binRoot) ? string.Join(", ", Directory.EnumerateDirectories(binRoot).Select(Path.GetFileName)) : "(none)";
             Console.WriteLine($"{UiSymbols.Gear} Runtime binaries ready for archs: {binArchs}");
 
@@ -331,7 +361,7 @@ internal class WorkspaceSetupService
             {
                 Console.WriteLine($"{UiSymbols.Search} Searching for .winmd metadata...");
             }
-            var winmds = layoutService.FindWinmds(pkgsDir, usedVersions).ToList();
+            var winmds = _packageLayoutService.FindWinmds(pkgsDir, usedVersions).ToList();
             if (!options.Quiet)
             {
                 Console.WriteLine($"{UiSymbols.Search} Found {winmds.Count} .winmd");
@@ -347,7 +377,7 @@ internal class WorkspaceSetupService
             {
                 Console.WriteLine($"{UiSymbols.Gear} Generating C++/WinRT projections...");
             }
-            await cppwinrtService.RunWithRspAsync(cppWinrtExe, winmds, includeOut, localWinsdkDir, verbose: !options.Quiet, cancellationToken: cancellationToken);
+            await _cppwinrtService.RunWithRspAsync(cppWinrtExe, winmds, includeOut, localWinsdkDir, verbose: !options.Quiet, cancellationToken: cancellationToken);
             Console.WriteLine($"{UiSymbols.Check} C++/WinRT headers generated → {includeOut}");
 
             // Step 6: Handle BuildTools
@@ -366,7 +396,7 @@ internal class WorkspaceSetupService
                 }
             }
 
-            var buildToolsPath = await buildToolsService.EnsureBuildToolsAsync(
+            var buildToolsPath = await _buildToolsService.EnsureBuildToolsAsync(
                 quiet: options.Quiet,
                 forceLatest: forceLatestBuildTools,
                 cancellationToken: cancellationToken);
@@ -386,8 +416,7 @@ internal class WorkspaceSetupService
                         Console.WriteLine($"{UiSymbols.Wrench} Checking Developer Mode...");
                     }
 
-                    var devModeService = new DevModeService();
-                    var devModeResult = devModeService.EnsureWin11DevMode();
+                    var devModeResult = _devModeService.EnsureWin11DevMode();
                     
                     if (devModeResult != 0 && devModeResult != 3010 && !options.Quiet)
                     {
@@ -451,8 +480,7 @@ internal class WorkspaceSetupService
                             Console.WriteLine($"{UiSymbols.New} Generating AppxManifest.xml...");
                         }
 
-                        var manifestService = new ManifestService();
-                        await manifestService.GenerateManifestAsync(
+                        await _manifestService.GenerateManifestAsync(
                             directory: options.BaseDirectory,
                             packageName: null, // Will use defaults and prompt if not --yes
                             publisherName: null, // Will use defaults and prompt if not --yes
@@ -498,8 +526,8 @@ internal class WorkspaceSetupService
                 {
                     finalConfig.SetVersion(kvp.Key, kvp.Value);
                 }
-                configService.Save(finalConfig);
-                Console.WriteLine($"{UiSymbols.Save} Wrote config → {configService.ConfigPath}");
+                _configService.Save(finalConfig);
+                Console.WriteLine($"{UiSymbols.Save} Wrote config → {_configService.ConfigPath}");
 
                 // Update .gitignore to exclude .winsdk folder (unless --no-gitignore is specified)
                 if (!options.NoGitignore)
@@ -514,10 +542,9 @@ internal class WorkspaceSetupService
                 // Step 8: Generate development certificate (unless --no-cert is specified)
                 if (!options.NoCert)
                 {
-                    var certificateServices = new CertificateServices(buildToolsService);
-                    var certPath = Path.Combine(options.BaseDirectory, CertificateServices.DefaultCertFileName);
+                    var certPath = Path.Combine(options.BaseDirectory, CertificateService.DefaultCertFileName);
                     
-                    await certificateServices.GenerateDevCertificateWithInferenceAsync(
+                    await _certificateService.GenerateDevCertificateWithInferenceAsync(
                         outputPath: certPath,
                         explicitPublisher: null,
                         manifestPath: null,
@@ -639,7 +666,6 @@ internal class WorkspaceSetupService
     /// <param name="cancellationToken">Cancellation token</param>
     public async Task InstallWindowsAppRuntimeAsync(string msixDir, bool verbose, CancellationToken cancellationToken)
     {
-        var powerShellService = new PowerShellService();
         var architecture = GetSystemArchitecture();
 
         // Get package entries from MSIX inventory
@@ -725,7 +751,7 @@ Write-Output ""ERROR|$(Split-Path $path -Leaf)|$($_.Exception.Message)""
         }
 
         // Execute the batch script
-        var (exitCode, output) = await powerShellService.RunCommandAsync(script, verbose: false, cancellationToken: cancellationToken);
+        var (exitCode, output) = await _powerShellService.RunCommandAsync(script, verbose: false, cancellationToken: cancellationToken);
 
         // Parse the output to provide user feedback
         var outputLines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
@@ -834,9 +860,9 @@ Write-Output ""ERROR|$(Split-Path $path -Leaf)|$($_.Exception.Message)""
     /// </summary>
     /// <param name="usedVersions">Optional dictionary of package versions to look for specific installed packages</param>
     /// <returns>The path to the MSIX directory, or null if not found</returns>
-    public static string? FindWindowsAppSdkMsixDirectory(Dictionary<string, string>? usedVersions = null)
+    public string? FindWindowsAppSdkMsixDirectory(Dictionary<string, string>? usedVersions = null)
     {
-        var globalWinsdkDir = BuildToolsService.GetGlobalWinsdkDirectory();
+        var globalWinsdkDir = _winsdkDirectoryService.GetGlobalWinsdkDirectory();
         var pkgsDir = Path.Combine(globalWinsdkDir, "packages");
         
         if (!Directory.Exists(pkgsDir))

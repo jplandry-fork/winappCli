@@ -1,6 +1,6 @@
-namespace Winsdk.Cli;
+namespace Winsdk.Cli.Services;
 
-internal sealed class PackageLayoutService
+internal sealed class PackageLayoutService : IPackageLayoutService
 {
     public void CopyIncludesFromPackages(string pkgsDir, string includeOut)
     {
