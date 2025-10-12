@@ -4,25 +4,30 @@ This package contains a pre-release development build of the Windows Development
 
 ## Quick Installation
 
-Simply run the installer script:
+Choose the easiest method for you:
 
-**Option A - Automatic (Recommended):**
+**Option A - Double-Click (Easiest):**
+1. Double-click `install.cmd`
+2. When prompted, allow elevation to Administrator
+3. Done! The installer handles everything automatically
+
+**Option B - Right-Click Menu:**
 1. Right-click on `install.ps1`
 2. Select "Run with PowerShell"
 3. When prompted, allow elevation to Administrator
-4. The script will install the certificate and bundle automatically
 
-**Option B - From PowerShell:**
+**Option C - From PowerShell:**
 1. Open PowerShell
 2. Navigate to this folder
 3. Run: `.\install.ps1`
 
-That's it! The script will handle both certificate and application installation.
+> **Note:** The installer automatically unblocks downloaded files and handles certificate installation, so no manual steps are needed!
 
 ## What's Included
 
 - **winsdk_[version].msixbundle** - The MSIX bundle with x64 and ARM64 packages
-- **install.ps1** - Automated installer script (handles certificate and bundle installation)
+- **install.cmd** - Double-click installer (easiest method)
+- **install.ps1** - PowerShell installer script (alternative method)
 
 ## Version Information
 
@@ -30,6 +35,11 @@ That's it! The script will handle both certificate and application installation.
 - Architectures: x64, ARM64
 
 ## Troubleshooting
+
+### "Cannot be loaded because running scripts is disabled"
+If you see a script execution error, you have two options:
+1. **Right-click** on `install.ps1` → Select **"Run with PowerShell"** (bypasses execution policy)
+2. Or manually unblock: Right-click `install.ps1` → Properties → Check "Unblock" → OK
 
 ### "Windows cannot install this package"
 - Make sure you ran `install.ps1` with administrator privileges

@@ -390,11 +390,17 @@ Write-Host "[DISTRIBUTE] Adding installation helpers..." -ForegroundColor Blue
 
 $MsixAssetsPath = Join-Path $PSScriptRoot "msix-assets"
 
-# Copy the installer script
+# Copy the PowerShell installer script
 $InstallerScriptSource = Join-Path $MsixAssetsPath "install-msix.ps1"
 $InstallerScriptDest = Join-Path $DistributionPath "install.ps1"
 Copy-Item $InstallerScriptSource $InstallerScriptDest -Force
-Write-Host "  - Added installer script" -ForegroundColor Gray
+Write-Host "  - Added PowerShell installer script" -ForegroundColor Gray
+
+# Copy the CMD wrapper script
+$InstallerCmdSource = Join-Path $MsixAssetsPath "install.cmd"
+$InstallerCmdDest = Join-Path $DistributionPath "install.cmd"
+Copy-Item $InstallerCmdSource $InstallerCmdDest -Force
+Write-Host "  - Added CMD wrapper script" -ForegroundColor Gray
 
 # Copy and customize the README
 $ReadmeSource = Join-Path $MsixAssetsPath "README.md"

@@ -29,6 +29,28 @@ param(
 # Set error action preference to stop on errors
 $ErrorActionPreference = "Stop"
 
+# Unblock downloaded files to avoid "downloaded from internet" warnings
+Write-Host "Checking for blocked files..." -ForegroundColor Gray
+$ScriptPath = $PSCommandPath
+if ($ScriptPath -and (Test-Path $ScriptPath)) {
+    try {
+        Unblock-File -Path $ScriptPath -ErrorAction SilentlyContinue
+        Write-Host "  - Unblocked installer script" -ForegroundColor Gray
+    } catch {
+        # Ignore errors - file might not be blocked
+    }
+}
+
+# Unblock all files in the current directory (bundle and other assets)
+try {
+    Get-ChildItem -Path (Split-Path $ScriptPath -Parent) -File | ForEach-Object {
+        Unblock-File -Path $_.FullName -ErrorAction SilentlyContinue
+    }
+    Write-Host "  - Unblocked bundle files" -ForegroundColor Gray
+} catch {
+    # Ignore errors - files might not be blocked
+}
+
 # Trap all errors and pause if elevated
 trap {
     Write-Host ""
