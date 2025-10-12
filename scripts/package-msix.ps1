@@ -148,6 +148,17 @@ if ([string]::IsNullOrEmpty($Version)) {
 
 Write-Host "[VERSION] MSIX package version: $MsixVersion" -ForegroundColor Cyan
 
+# [Temporary], Ensure build tools are available in CI
+Write-Host "[CLI] Ensure build tools are available" -ForegroundColor Cyan
+$UpdateCmd = "& `"$CliExe`" update"
+Write-Host "  Command: $UpdateCmd" -ForegroundColor DarkGray
+Invoke-Expression $UpdateCmd
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Failed to download build tools"
+    exit 1
+}
+
 # Define paths
 $ArtifactsPath = Join-Path $ProjectRoot "artifacts"
 $MsixLayoutPath = Join-Path $ArtifactsPath "msix-layout"
