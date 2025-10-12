@@ -98,23 +98,7 @@ if (-not $SkipTests) {
     Write-Host "[TEST] Skipping tests (SkipTests flag set)" -ForegroundColor Yellow
 }
 
-# Step 3: Publish CLI for x64
-Write-Host "[PUBLISH] Publishing CLI for x64..." -ForegroundColor Blue
-dotnet publish $CliProjectPath -c Release -r win-x64 --self-contained -o "$ArtifactsPath\cli\win-x64"
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "Failed to publish CLI for x64"
-    exit 1
-}
-
-# Step 4: Publish CLI for arm64
-Write-Host "[PUBLISH] Publishing CLI for arm64..." -ForegroundColor Blue
-dotnet publish $CliProjectPath -c Release -r win-arm64 --self-contained -o "$ArtifactsPath\cli\win-arm64"
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "Failed to publish CLI for arm64"
-    exit 1
-}
-
-# Step 5: Calculate version with build number
+# Step 3: Calculate version with build number (moved before publish)
 Write-Host "[VERSION] Calculating package version..." -ForegroundColor Blue
 
 # Read base version from version.json
@@ -137,6 +121,46 @@ if ($LASTEXITCODE -ne 0) {
 # Construct full version (npm format: major.minor.patch-build.number)
 $FullVersion = "$BaseVersion-build.$BuildNumber"
 Write-Host "[VERSION] Package version: $FullVersion" -ForegroundColor Cyan
+
+# Extract semantic version components for assembly versioning
+# BaseVersion should be in format major.minor.patch (e.g., "0.1.0")
+$VersionParts = $BaseVersion -split '\.'
+$MajorVersion = $VersionParts[0]
+$MinorVersion = $VersionParts[1]
+$PatchVersion = $VersionParts[2]
+
+# Assembly version uses format: major.minor.patch.buildnumber (e.g., "0.1.0.73")
+$AssemblyVersion = "$MajorVersion.$MinorVersion.$PatchVersion.$BuildNumber"
+Write-Host "[VERSION] Assembly version: $AssemblyVersion" -ForegroundColor Cyan
+
+# InformationalVersion shows in --version output (e.g., "0.1.0-build.73")
+$InformationalVersion = $FullVersion
+
+# Step 4: Publish CLI for x64 with version properties
+Write-Host "[PUBLISH] Publishing CLI for x64..." -ForegroundColor Blue
+dotnet publish $CliProjectPath -c Release -r win-x64 --self-contained -o "$ArtifactsPath\cli\win-x64" `
+    /p:Version=$AssemblyVersion `
+    /p:AssemblyVersion=$AssemblyVersion `
+    /p:FileVersion=$AssemblyVersion `
+    /p:InformationalVersion=$InformationalVersion `
+    /p:IncludeSourceRevisionInInformationalVersion=false
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Failed to publish CLI for x64"
+    exit 1
+}
+
+# Step 5: Publish CLI for arm64 with version properties
+Write-Host "[PUBLISH] Publishing CLI for arm64..." -ForegroundColor Blue
+dotnet publish $CliProjectPath -c Release -r win-arm64 --self-contained -o "$ArtifactsPath\cli\win-arm64" `
+    /p:Version=$AssemblyVersion `
+    /p:AssemblyVersion=$AssemblyVersion `
+    /p:FileVersion=$AssemblyVersion `
+    /p:InformationalVersion=$InformationalVersion `
+    /p:IncludeSourceRevisionInInformationalVersion=false
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Failed to publish CLI for arm64"
+    exit 1
+}
 
 # Step 6: Prepare npm package
 Write-Host "[NPM] Preparing npm package..." -ForegroundColor Blue
