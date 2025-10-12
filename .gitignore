@@ -199,3 +199,7 @@ vcpkg_installed/
 CMakeCache.txt
 
 /artifacts
+
+# Development certificate
+devcert.pfx
+*.msix

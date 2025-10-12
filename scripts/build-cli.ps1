@@ -1,19 +1,30 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Build script for Windows SDK CLI and npm package
+    Build script for Windows SDK CLI, npm package, and MSIX bundle
 .DESCRIPTION
     This script builds the Windows SDK CLI for both x64 and arm64 architectures,
-    creates the npm package, and places all artifacts in an artifacts folder.
-    Run this script from the root of the project.
+    creates the npm package, creates MSIX bundle with distribution package, and 
+    places all artifacts in an artifacts folder. Run this script from the root of the project.
+.PARAMETER SkipTests
+    Skip running unit tests
+.PARAMETER FailOnTestFailure
+    Exit with error code if tests fail (default: false, only warns)
+.PARAMETER SkipMsix
+    Skip MSIX bundle creation
 .EXAMPLE
     .\scripts\build-cli.ps1
+.EXAMPLE
+    .\scripts\build-cli.ps1 -SkipTests
+.EXAMPLE
+    .\scripts\build-cli.ps1 -SkipMsix
 #>
 
 param(
     [switch]$Clean = $false,
     [switch]$SkipTests = $false,
-    [switch]$FailOnTestFailure = $false
+    [switch]$FailOnTestFailure = $false,
+    [switch]$SkipMsix = $false
 )
 
 # Ensure we're running from the project root
@@ -178,6 +189,29 @@ if ($PackResult -ne 0) {
     exit 1
 }
 Pop-Location
+
+# Step 8: Create MSIX bundle (optional)
+if (-not $SkipMsix) {
+    Write-Host ""
+    Write-Host "[MSIX] Creating MSIX bundle..." -ForegroundColor Blue
+    
+    # Convert npm version format (e.g., 0.1.0-build.73) to MSIX format (e.g., 0.1.0.73)
+    $MsixVersion = $FullVersion -replace '-build\.', '.'
+    
+    $PackageMsixScript = Join-Path $PSScriptRoot "package-msix.ps1"
+    $CliBinariesPath = Join-Path (Join-Path $ProjectRoot $ArtifactsPath) "cli"
+    
+    & $PackageMsixScript -CliBinariesPath $CliBinariesPath -Version $MsixVersion
+    
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "MSIX bundle creation failed, but continuing..."
+    } else {
+        Write-Host "[MSIX] MSIX bundle created successfully!" -ForegroundColor Green
+    }
+} else {
+    Write-Host ""
+    Write-Host "[MSIX] Skipping MSIX bundle creation (use -SkipMsix:`$false to enable)" -ForegroundColor Gray
+}
 
 # Build process complete - all artifacts are ready
 

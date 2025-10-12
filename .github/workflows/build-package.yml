@@ -26,11 +26,11 @@ jobs:
       with:
         node-version: '24'
     
-    # Run the build script which handles building, testing, versioning, and packaging
+    # Run the build script which handles building, testing, versioning, npm packaging, and MSIX bundling
     - name: Build, test, and package
       run: .\scripts\build-cli.ps1
     
-    # Upload artifacts
+    # Upload all build artifacts
     - name: Upload test results
       if: ${{ !cancelled() }}
       uses: actions/upload-artifact@v4
@@ -49,3 +49,15 @@ jobs:
       with:
         name: npm-package
         path: artifacts/*.tgz
+    
+    - name: Upload MSIX bundle distribution
+      uses: actions/upload-artifact@v4
+      with:
+        name: msix-bundle
+        path: artifacts/msix-bundle/
+    
+    - name: Upload MSIX layout
+      uses: actions/upload-artifact@v4
+      with:
+        name: msix-layout
+        path: artifacts/msix-layout/
