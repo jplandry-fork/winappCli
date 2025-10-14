@@ -12,12 +12,6 @@ resources:
     name: 1ESPipelineTemplates/1ESPipelineTemplates
     ref: refs/tags/release
 
-parameters:
-  - name: dotnet_configurations
-    type: object
-    default:
-      - Release
-
 extends:
   template: v1/1ES.Unofficial.PipelineTemplate.yml@1esPipelines
   parameters:
@@ -29,23 +23,20 @@ extends:
     stages:
     - stage: Build
       jobs:
-      - ${{ each dotnet_config in parameters.dotnet_configurations }}:
-        - job: Build_${{ dotnet_config }}
-          pool:
-            name: Azure-Pipelines-1ESPT-ExDShared
-            image: windows-latest
-            os: windows
-            hostArchitecture: amd64
-          steps:
-            - checkout: self
-            - task: UseDotNet@2
-              displayName: Setup .NET 9
-              inputs:
-                version: 9.0.x
-            - task: UseNode@1
-              displayName: Setup Node.js 24
-              inputs:
-                version: '24.x'
-            - template: ./.pipelines/templates/build.yaml@self
-              parameters:
-                dotnet_configuration: ${{ dotnet_config }}
+      - job: Build
+        pool:
+          name: Azure-Pipelines-1ESPT-ExDShared
+          image: windows-latest
+          os: windows
+          hostArchitecture: amd64
+        steps:
+          - checkout: self
+          - task: UseDotNet@2
+            displayName: Setup .NET 9
+            inputs:
+              version: 9.0.x
+          - task: UseNode@1
+            displayName: Setup Node.js 24
+            inputs:
+              version: '24.x'
+          - template: ./.pipelines/templates/build.yaml@self

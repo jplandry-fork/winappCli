@@ -1,10 +1,9 @@
-parameters:
-  dotnet_configuration: 'Release'
-
 steps:
-- script: |
-    .\scripts\build-cli.ps1
+- task: PowerShell@2
   displayName: Build CLI
+  inputs:
+    pwsh: true
+    filePath: $(System.DefaultWorkingDirectory)\scripts\build-cli.ps1
 - task: CopyFiles@2
   displayName: Copy Artifacts
   inputs:
