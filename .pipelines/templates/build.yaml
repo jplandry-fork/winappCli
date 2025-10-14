@@ -1,0 +1,28 @@
+parameters:
+  dotnet_configuration: 'Release'
+
+steps:
+- script: |
+    .\scripts\build-cli.ps1
+  displayName: Build CLI
+- task: CopyFiles@2
+  displayName: Copy Artifacts
+  inputs:
+    sourceFolder: '$(System.DefaultWorkingDirectory)/artifacts/'
+    contents: '**/*'
+    targetFolder: '$(Build.ArtifactStagingDirectory)'
+- task: 1ES.PublishPipelineArtifact@1
+  displayName: Upload Artifact - Test Results
+  inputs:
+    path: '$(Build.ArtifactStagingDirectory)/TestResults/*.trx'
+    artifactName: test-results
+- task: 1ES.PublishPipelineArtifact@1
+  displayName: Upload Artifact - CLI Binaries
+  inputs:
+    path: '$(Build.ArtifactStagingDirectory)/cli/**.*'
+    artifactName: cli-binaries
+- task: 1ES.PublishPipelineArtifact@1
+  displayName: Upload Artifact - NPM Package
+  inputs:
+    path: '$(Build.ArtifactStagingDirectory)/*.tgz'
+    artifactName: npm-package
