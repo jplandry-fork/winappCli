@@ -156,10 +156,12 @@ internal class BuildToolsService : IBuildToolsService
     }
 
     /// <summary>
-    /// Get the full path to a specific BuildTools executable
+    /// Get the full path to a specific BuildTools executable if it exists in the current installation.
+    /// This method does NOT install BuildTools if they are missing.
+    /// Use EnsureBuildToolAvailableAsync if you want automatic installation.
     /// </summary>
     /// <param name="toolName">Name of the tool (e.g., 'mt.exe', 'signtool.exe')</param>
-    /// <returns>Full path to the executable</returns>
+    /// <returns>Full path to the executable if found, null otherwise</returns>
     public string? GetBuildToolPath(string toolName)
     {
         var winsdkDir = _winsdkDirectoryService.GetGlobalWinsdkDirectory();
@@ -172,6 +174,50 @@ internal class BuildToolsService : IBuildToolsService
 
         var toolPath = Path.Combine(binPath, toolName);
         return File.Exists(toolPath) ? toolPath : null;
+    }
+
+    /// <summary>
+    /// Ensures a build tool is available by finding it in existing installation or installing BuildTools if necessary
+    /// </summary>
+    /// <param name="toolName">Name of the tool (e.g., 'mt.exe', 'signtool.exe'). The .exe extension will be automatically added if not present.</param>
+    /// <param name="quiet">Suppress progress messages during auto-installation</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Full path to the executable. Throws an exception if the tool cannot be found or installed.</returns>
+    /// <exception cref="FileNotFoundException">Thrown when the tool cannot be found even after installing BuildTools</exception>
+    /// <exception cref="InvalidOperationException">Thrown when BuildTools installation fails</exception>
+    public async Task<string> EnsureBuildToolAvailableAsync(string toolName, bool quiet = false, CancellationToken cancellationToken = default)
+    {
+        // First, try to find the tool in existing installation
+        var toolPath = GetBuildToolPath(toolName);
+        if (toolPath == null && !toolName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+        {
+            toolPath = GetBuildToolPath(toolName + ".exe");
+        }
+
+        // If tool not found, ensure BuildTools are installed
+        if (toolPath == null)
+        {
+            var binPath = await EnsureBuildToolsAsync(quiet: quiet, cancellationToken: cancellationToken);
+            if (binPath == null)
+            {
+                throw new InvalidOperationException("Could not install or find Windows SDK Build Tools.");
+            }
+
+            // Try again after installation
+            toolPath = GetBuildToolPath(toolName);
+            if (toolPath == null && !toolName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            {
+                toolPath = GetBuildToolPath(toolName + ".exe");
+            }
+        }
+
+        if (toolPath == null)
+        {
+            var actualToolName = toolName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? toolName : toolName + ".exe";
+            throw new FileNotFoundException($"Could not find '{actualToolName}' in the Windows SDK Build Tools.");
+        }
+
+        return toolPath;
     }
 
     /// <summary>
@@ -237,17 +283,15 @@ internal class BuildToolsService : IBuildToolsService
     /// <param name="toolName">Name of the tool (e.g., 'mt.exe', 'signtool.exe')</param>
     /// <param name="arguments">Arguments to pass to the tool</param>
     /// <param name="verbose">Whether to output verbose information</param>
+    /// <param name="quiet">Suppress progress messages during auto-installation of BuildTools</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Tuple containing (stdout, stderr)</returns>
-    public async Task<(string stdout, string stderr)> RunBuildToolAsync(string toolName, string arguments, bool verbose = false, CancellationToken cancellationToken = default)
+    public async Task<(string stdout, string stderr)> RunBuildToolAsync(string toolName, string arguments, bool verbose = false, bool quiet = false, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var toolPath = GetBuildToolPath(toolName);
-        if (toolPath == null)
-        {
-            throw new FileNotFoundException($"Could not find {toolName}. Make sure the Microsoft.Windows.SDK.BuildTools package is installed in a .winsdk directory.");
-        }
+        // Ensure the build tool is available, installing BuildTools if necessary
+        var toolPath = await EnsureBuildToolAvailableAsync(toolName, quiet: quiet, cancellationToken: cancellationToken);
 
         var psi = new ProcessStartInfo
         {
