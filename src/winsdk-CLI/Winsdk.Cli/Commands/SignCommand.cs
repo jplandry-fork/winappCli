@@ -58,6 +58,11 @@ internal class SignCommand : Command
                 Console.WriteLine($"🔐 Signed file: {filePath}");
                 return 0;
             }
+            catch (InvalidOperationException error)
+            {
+                Console.Error.WriteLine(error.Message);
+                return 1;
+            }
             catch (Exception error)
             {
                 Console.Error.WriteLine($"❌ Failed to sign file: {error.Message}");
