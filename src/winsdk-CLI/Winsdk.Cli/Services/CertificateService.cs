@@ -1,4 +1,5 @@
 using Winsdk.Cli.Helpers;
+using System.Diagnostics.Eventing.Reader;
 
 namespace Winsdk.Cli.Services;
 
@@ -57,7 +58,7 @@ internal class CertificateService : ICertificateService
         var subjectName = $"CN={cleanPublisher}";
 
         var command = $"$dest='{outputPath}';$cert=New-SelfSignedCertificate -Type Custom -Subject '{subjectName}' -KeyUsage DigitalSignature -FriendlyName 'MSIX Dev Certificate' -CertStoreLocation 'Cert:\\CurrentUser\\My' -KeyProtection None -KeyExportPolicy Exportable -Provider 'Microsoft Software Key Storage Provider' -TextExtension @('2.5.29.37={{text}}1.3.6.1.5.5.7.3.3', '2.5.29.19={{text}}') -NotAfter (Get-Date).AddDays({validDays}); Export-PfxCertificate -Cert $cert -FilePath $dest -Password (ConvertTo-SecureString -String '{password}' -Force -AsPlainText) -Force";
-        
+
         if (verbose)
         {
             Console.WriteLine($"Generating development certificate for publisher: {cleanPublisher}");
@@ -201,6 +202,34 @@ internal class CertificateService : ICertificateService
                 Console.WriteLine("File signed successfully");
             }
         }
+        catch (BuildToolsService.InvalidBuildToolException ex)
+            when (ex.Stdout.Contains("0x800"))
+        {
+            var query = new EventLogQuery(
+                "Microsoft-Windows-AppxPackaging/Operational",
+                PathType.LogName,
+                $"*[System[Level=2 and Execution[@ProcessID={ex.ProcessId}]]]");
+
+            EventRecord? record = null;
+            var timeout = TimeSpan.FromSeconds(5);
+            var pollingInterval = TimeSpan.FromMilliseconds(500);
+            var startTime = DateTime.UtcNow;
+
+            while (record == null && (DateTime.UtcNow - startTime) < timeout && !cancellationToken.IsCancellationRequested)
+            {
+                using var reader = new EventLogReader(query);
+                record = reader.ReadEvent();
+
+                if (record != null)
+                {
+                    throw new InvalidOperationException($"Failed to sign file: {record.FormatDescription()}", ex);
+                }
+                
+                await Task.Delay(pollingInterval, cancellationToken);
+            }
+
+            throw;
+        }
         catch (Exception ex)
         {
             throw new InvalidOperationException($"Failed to sign file: {ex.Message}", ex);
@@ -267,11 +296,11 @@ internal class CertificateService : ICertificateService
 
             // Generate the certificate
             var result = await GenerateDevCertificateAsync(
-                publisher, 
-                outputPath, 
-                password, 
-                validDays, 
-                verbose, 
+                publisher,
+                outputPath,
+                password,
+                validDays,
+                verbose,
                 cancellationToken);
 
             // Success message
@@ -298,7 +327,7 @@ internal class CertificateService : ICertificateService
                 {
                     Console.WriteLine("Installing certificate...");
                 }
-                
+
                 var installResult = await InstallCertificateAsync(result.CertificatePath, password, false, verbose, cancellationToken);
                 if (installResult)
                 {
@@ -358,10 +387,10 @@ internal class CertificateService : ICertificateService
                 throw new InvalidOperationException($"Certificate subject does not contain CN field: {subject}");
 
             var publisher = cnMatch.Groups[1].Value.Trim();
-            
+
             // Remove any quotes that might be present
             publisher = publisher.Trim('"', '\'');
-            
+
             return publisher;
         }
         catch (Exception ex) when (!(ex is FileNotFoundException || ex is InvalidOperationException))
@@ -384,15 +413,15 @@ internal class CertificateService : ICertificateService
         {
             // Extract publisher from certificate
             var certPublisher = ExtractPublisherFromCertificate(certificatePath, password);
-            
+
             // Extract publisher from manifest
             var manifestIdentity = await MsixService.ParseAppxManifestFromPathAsync(manifestPath, cancellationToken);
             var manifestPublisher = manifestIdentity.Publisher;
-            
+
             // Normalize both publishers for comparison (remove CN= prefix and quotes)
             var normalizedCertPublisher = ManifestTemplateService.StripCnPrefix(certPublisher);
             var normalizedManifestPublisher = ManifestTemplateService.StripCnPrefix(manifestPublisher);
-            
+
             // Compare publishers (case-insensitive)
             if (!string.Equals(normalizedCertPublisher, normalizedManifestPublisher, StringComparison.OrdinalIgnoreCase))
             {
@@ -414,10 +443,10 @@ internal class CertificateService : ICertificateService
     /// 4. Use the system default publisher (from SystemDefaultsService.GetDefaultPublisherCN())
     /// </summary>
     private async Task<string> InferPublisherAsync(
-        string? explicitPublisher, 
-        string? manifestPath, 
+        string? explicitPublisher,
+        string? manifestPath,
         string defaultPublisher,
-        bool verbose, 
+        bool verbose,
         CancellationToken cancellationToken)
     {
         // 1. If explicit publisher is provided, use that
@@ -439,7 +468,7 @@ internal class CertificateService : ICertificateService
                 {
                     Console.WriteLine($"Extracting publisher from manifest: {manifestPath}");
                 }
-                
+
                 var identityInfo = await MsixService.ParseAppxManifestFromPathAsync(manifestPath, cancellationToken);
                 return identityInfo.Publisher;
             }
@@ -462,7 +491,7 @@ internal class CertificateService : ICertificateService
                 {
                     Console.WriteLine($"Found project manifest: {projectManifestPath}");
                 }
-                
+
                 var identityInfo = await MsixService.ParseAppxManifestFromPathAsync(projectManifestPath, cancellationToken);
                 return identityInfo.Publisher;
             }
