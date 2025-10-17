@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 using static Winsdk.Cli.Services.CertificateService;
 
 namespace Winsdk.Cli.Services;

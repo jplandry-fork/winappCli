@@ -1,0 +1,50 @@
+trigger:
+  branches:
+    include:
+      - rel/v*
+pr: none
+
+resources:
+  repositories:
+  - repository: 1esPipelines
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+
+extends:
+  template: v1/1ES.Official.PipelineTemplate.yml@1esPipelines
+  parameters:
+    sdl:
+      sourceAnalysisPool:
+        name: Azure-Pipelines-1ESPT-ExDShared
+        image: windows-latest
+        os: windows
+    stages:
+    - stage: Build
+      jobs:
+      - job: Build
+        pool:
+          name: Azure-Pipelines-1ESPT-ExDShared
+          image: windows-latest
+          os: windows
+          hostArchitecture: amd64
+        steps:
+          - checkout: self
+          - task: UseDotNet@2
+            displayName: Setup .NET 9
+            inputs:
+              version: 9.0.x
+          - task: UseNode@1
+            displayName: Setup Node.js 24
+            inputs:
+              version: '24.x'
+          - script: move /Y $(Build.SourcesDirectory)\.pipelines\release-nuget.config $(Build.SourcesDirectory)\nuget.config
+            displayName: Add release package source
+          - task: NuGetAuthenticate@1
+          - task: PowerShell@2
+            displayName: Replace Stubbed Files
+            inputs:
+              filePath: '.pipelines/Unstub.ps1'
+          - template: ./.pipelines/templates/build.yaml@self
+            parameters:
+              stable: 'true'

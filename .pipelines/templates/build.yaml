@@ -1,9 +1,13 @@
+parameters:
+  stable: 'false'
+
 steps:
 - task: PowerShell@2
   displayName: Build CLI
   inputs:
     pwsh: true
     filePath: $(System.DefaultWorkingDirectory)\scripts\build-cli.ps1
+    arguments: '-Stable $(stable)'
 - task: CopyFiles@2
   displayName: Copy Artifacts - Test Results
   inputs:

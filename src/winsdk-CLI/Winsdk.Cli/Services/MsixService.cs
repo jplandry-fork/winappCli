@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 using Microsoft.Extensions.Logging;
 using System.IO.Compression;
 using System.Security;
@@ -989,7 +992,7 @@ internal partial class MsixService(
                 sb.AppendLine(@"</asmv3:file>");
             }
         }
-        
+
         sb.AppendLine(@"</assembly>");
         var manifestContent = sb.ToString();
 
@@ -1368,7 +1371,7 @@ $1");
         {
             return null;
         }
-        
+
         // Look for the runtime package in the cached dependencies
         var runtimePackage = cachedPackages.FirstOrDefault(kvp =>
             kvp.Key.StartsWith("Microsoft.WindowsAppSDK.Runtime", StringComparison.OrdinalIgnoreCase));

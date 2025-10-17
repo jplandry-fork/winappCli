@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -18,12 +18,19 @@
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <TrimmerRootDescriptor>TrimRoots.xml</TrimmerRootDescriptor>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <StackTraceSupport>false</StackTraceSupport>
+    <OptimizationPreference>Size</OptimizationPreference>
     <TrimMode>full</TrimMode>
 
     <!-- Faster startup for single-file -->
     <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
     <DebuggerSupport>false</DebuggerSupport>
-    <EventSourceSupport>false</EventSourceSupport>
+    <EventSourceSupport>true</EventSourceSupport>
+
+    <!-- The *first* DefineConstants is removed during Official Release Builds (.pipelines/Unstub.ps1)-->
+    <DefineConstants>TELEMETRYEVENTSOURCE_PUBLIC</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -33,10 +40,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.10" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.10" />
-    <PackageReference Include="System.CommandLine" Version="2.0.0-rc.2.25502.107" />
-    <PackageReference Include="System.Diagnostics.EventLog" Version="9.0.10" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
+    <PackageReference Include="System.CommandLine" />
+    <PackageReference Include="System.Diagnostics.EventLog" />
   </ItemGroup>
 
   <ItemGroup>

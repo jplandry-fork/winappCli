@@ -1,8 +1,12 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Text;
 using Winsdk.Cli.Commands;
 using Winsdk.Cli.Helpers;
+using Winsdk.Cli.Telemetry.Events;
 
 namespace Winsdk.Cli;
 
@@ -56,7 +60,11 @@ internal static class Program
 
         var rootCommand = serviceProvider.GetRequiredService<WinSdkRootCommand>();
 
-        return await rootCommand.Parse(args).InvokeAsync();
+        var parseResult = rootCommand.Parse(args);
+
+        CommandExecutedEvent.Log(parseResult.CommandResult.Command.GetType().FullName!);
+
+        return await parseResult.InvokeAsync();
     }
 
     internal static bool PromptYesNo(string message)
