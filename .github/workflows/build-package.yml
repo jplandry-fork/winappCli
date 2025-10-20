@@ -39,7 +39,7 @@ jobs:
         $versionJson = Get-Content "version.json" | ConvertFrom-Json
         $baseVersion = $versionJson.version
         $buildNumber = & ".\scripts\get-build-number.ps1"
-        $fullVersion = "$baseVersion-preview.$buildNumber"
+        $fullVersion = "$baseVersion-prerelease.$buildNumber"
         
         # Export for use in subsequent steps
         echo "version=$fullVersion" >> $env:GITHUB_OUTPUT
