@@ -59,6 +59,6 @@ ipcMain.handle('show-notification', async (event, title, body) => {
   addon.showNotification(title, body);
 });
 
-ipcMain.handle('show-app-window', async () => {
-  getCsAddon().Addon.showAppWindow();
-});
+ipcMain.handle('get-windows-app-runtime-version', async () => {
+  return getCsAddon().Addon.getWindowsAppRuntimeVersion();
+}); 

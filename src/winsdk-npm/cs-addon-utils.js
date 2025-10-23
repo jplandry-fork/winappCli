@@ -38,7 +38,7 @@ async function generateCsAddonFiles(options = {}) {
     await fs.mkdir(addonDir, { recursive: true });
 
     // Copy and process template files
-    await copyTemplateFiles(name, addonDir, false); // Don't show individual file messages
+    await copyTemplateFiles(name, addonDir, projectRoot, false); // Don't show individual file messages
 
     // Install required npm packages
     await installNodeApiDotnet(projectRoot, false); // Don't show package install details
@@ -131,12 +131,13 @@ async function checkDotnetSdk(verbose) {
 }
 
 /**
- * Copies and processes template files to the addon directory
+ * Copies and processes template files to the addon directory and project root
  * @param {string} addonName - Name of the addon
  * @param {string} addonDir - Target addon directory
+ * @param {string} projectRoot - Project root directory
  * @param {boolean} verbose - Enable verbose logging
  */
-async function copyTemplateFiles(addonName, addonDir, verbose) {
+async function copyTemplateFiles(addonName, addonDir, projectRoot, verbose) {
   const templateDir = path.join(__dirname, 'cs-addon-template');
   
   if (!fsSync.existsSync(templateDir)) {
@@ -180,6 +181,21 @@ async function copyTemplateFiles(addonName, addonDir, verbose) {
   
   if (verbose) {
     console.log(`📄 Created README.md`);
+  }
+
+  // Copy Directory.packages.props to project root (if it doesn't exist)
+  const packagePropsTarget = path.join(projectRoot, 'Directory.packages.props');
+  if (!fsSync.existsSync(packagePropsTarget)) {
+    const packagePropsTemplate = path.join(templateDir, 'Directory.packages.props.template');
+    await fs.copyFile(packagePropsTemplate, packagePropsTarget);
+    
+    if (verbose) {
+      console.log(`📄 Created Directory.packages.props`);
+    }
+  } else {
+    if (verbose) {
+      console.log(`📄 Directory.packages.props already exists, skipping`);
+    }
   }
 }
 

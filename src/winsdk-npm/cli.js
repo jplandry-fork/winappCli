@@ -169,12 +169,12 @@ async function handleNode(args) {
     console.log('');
     console.log('Subcommands:');
     console.log('  create-addon                Generate native addon files for Electron');
-    console.log('  create-cs-addon             Generate C# addon files for Electron');
     console.log('  add-electron-debug-identity Add MSIX identity to Electron debug process');
     console.log('');
     console.log('Examples:');
+    console.log(`  ${CLI_NAME} node create-addon --help`);
     console.log(`  ${CLI_NAME} node create-addon --name myAddon`);
-    console.log(`  ${CLI_NAME} node create-cs-addon --name myCsAddon`);
+    console.log(`  ${CLI_NAME} node create-cs-addon --name myCsAddon --template cs`);
     console.log(`  ${CLI_NAME} node add-electron-debug-identity`);
     console.log('');
     console.log(`Use "${CLI_NAME} node <subcommand> --help" for detailed help on each subcommand.`);
@@ -187,10 +187,6 @@ async function handleNode(args) {
   switch (subcommand) {
     case 'create-addon':
       await handleCreateAddon(subcommandArgs);
-      break;
-      
-    case 'create-cs-addon':
-      await handleCreateCsAddon(subcommandArgs);
       break;
       
     case 'add-electron-debug-identity':
@@ -206,109 +202,79 @@ async function handleNode(args) {
 
 async function handleCreateAddon(args) {
   const options = parseArgs(args, {
-    name: 'nativeWindowsAddon',
+    name: undefined, // Will be set based on template
+    template: 'cpp',
     verbose: true
   });
+
+  // Set default name based on template
+  if (!options.name) {
+    options.name = options.template === 'cs' ? 'csAddon' : 'nativeWindowsAddon';
+  }
 
   if (options.help) {
     console.log(`Usage: ${CLI_NAME} node create-addon [options]`);
     console.log('');
-    console.log('Generate native addon files for Electron project');
-    console.log('');
-    console.log('This command will:');
-    console.log('  1. Create a new addon directory with template files');
-    console.log('  2. Replace placeholders with the provided addon name');
-    console.log('  3. Install required npm packages (nan, node-addon-api, node-gyp)');
-    console.log('  4. Add build script to package.json');
+    console.log('Generate addon files for Electron project');
     console.log('');
     console.log('Options:');
-    console.log('  --name <name>         Addon name (default: nativeWindowsAddon)');
+    console.log('  --name <name>         Addon name (default depends on template)');
+    console.log('  --template <type>     Addon template: cpp, cs (default: cpp)');
     console.log('  --verbose             Enable verbose output (default: true)');
     console.log('  --help                Show this help');
     console.log('');
+    console.log('Templates:');
+    console.log('  cpp                   C++ native addon (node-gyp)');
+    console.log('  cs                    C# addon (node-api-dotnet)');
+    console.log('');
     console.log('Examples:');
     console.log(`  ${CLI_NAME} node create-addon`);
-    console.log(`  ${CLI_NAME} node create-addon --name myCustomAddon`);
+    console.log(`  ${CLI_NAME} node create-addon --name myAddon`);
+    console.log(`  ${CLI_NAME} node create-addon --template=cs --name MyCsAddon`);
     console.log('');
     console.log('Note: This command must be run from the root of an Electron project');
     console.log('      (directory containing package.json)');
     return;
   }
 
-  try {
-    const result = await generateAddonFiles({
-      name: options.name,
-      verbose: options.verbose
-    });
-
-    console.log(`✅ Addon files generated successfully!`);
-    console.log(`📦 Addon name: ${result.addonName}`);
-    console.log(`📁 Addon path: ${result.addonPath}`);
-    console.log(`🔨 Build with: npm run build-${result.addonName}`);
-    console.log(`🔨 In your source, import the addon with:`);
-    console.log(`       "const ${result.addonName} = require('./${result.addonName}/build/Release/${result.addonName}.node')";`);
-  } catch (error) {
-    console.error(`❌ Failed to generate addon files: ${error.message}`);
+  // Validate template
+  if (!['cpp', 'cs'].includes(options.template)) {
+    console.error(`❌ Invalid template: ${options.template}. Valid options: cpp, cs`);
     process.exit(1);
   }
-}
-
-async function handleCreateCsAddon(args) {
-  const options = parseArgs(args, {
-    name: 'csAddon',
-    verbose: true
-  });
-
-  if (options.help) {
-    console.log(`Usage: ${CLI_NAME} node create-cs-addon [options]`);
-    console.log('');
-    console.log('Generate C# addon files for Electron project');
-    console.log('');
-    console.log('This command will:');
-    console.log('  1. Create a new C# addon directory with template files');
-    console.log('  2. Generate a .csproj file and addon.cs with sample code');
-    console.log('  3. Install node-api-dotnet package');
-    console.log('  4. Add build scripts to package.json');
-    console.log('  5. Update .gitignore with C# build artifacts');
-    console.log('');
-    console.log('Options:');
-    console.log('  --name <name>         Addon name (default: csAddon)');
-    console.log('                        Must be a valid C# namespace/class name');
-    console.log('  --verbose             Enable verbose output (default: true)');
-    console.log('  --help                Show this help');
-    console.log('');
-    console.log('Examples:');
-    console.log(`  ${CLI_NAME} node create-cs-addon`);
-    console.log(`  ${CLI_NAME} node create-cs-addon --name MyWindowsAddon`);
-    console.log('');
-    console.log('Requirements:');
-    console.log('  - .NET 8.0 SDK or later must be installed');
-    console.log('  - Command must be run from the root of an Electron project');
-    console.log('    (directory containing package.json)');
-    console.log('');
-    console.log('After creation:');
-    console.log('  - Build with: npm run build-<name>');
-    console.log('  - Clean with: npm run clean-<name>');
-    console.log('  - Import in JavaScript:');
-    console.log('      const dotnet = require(\'node-api-dotnet\');');
-    console.log('      const module = dotnet.require(\'./build/Release/<name>\');');
-    return;
-  }
 
   try {
-    const result = await generateCsAddonFiles({
-      name: options.name,
-      verbose: options.verbose
-    });
+    let result;
+    
+    if (options.template === 'cs') {
+      // Use C# addon generator
+      result = await generateCsAddonFiles({
+        name: options.name,
+        verbose: options.verbose
+      });
+      
+      console.log(`✅ C# addon '${result.addonName}' created successfully!`);
+      console.log(`📁 ${result.addonPath}`);
+      console.log('');
+      console.log(`Next steps:`);
+      console.log(`  1. npm run build-${result.addonName}`);
+      console.log(`  2. See ${result.addonName}/README.md for usage examples`);
+    } else {
+      // Use C++ addon generator (existing)
+      result = await generateAddonFiles({
+        name: options.name,
+        verbose: options.verbose
+      });
 
-    console.log(`✅ C# addon '${result.addonName}' created successfully!`);
-    console.log(`📁 ${result.addonPath}`);
-    console.log('');
-    console.log(`Next steps:`);
-    console.log(`  1. npm run build-${result.addonName}`);
-    console.log(`  2. See ${result.addonName}/README.md for usage examples`);
+      console.log(`✅ Addon files generated successfully!`);
+      console.log(`📦 Addon name: ${result.addonName}`);
+      console.log(`📁 Addon path: ${result.addonPath}`);
+      console.log(`🔨 Build with: npm run build-${result.addonName}`);
+      console.log(`🔨 In your source, import the addon with:`);
+      console.log(`       "const ${result.addonName} = require('./${result.addonName}/build/Release/${result.addonName}.node')";`);
+    }
   } catch (error) {
-    console.error(`❌ Failed to generate C# addon files: ${error.message}`);
+    console.error(`❌ Failed to generate addon files: ${error.message}`);
     process.exit(1);
   }
 }
@@ -359,17 +325,29 @@ function parseArgs(args, defaults = {}) {
     if (arg === '--help' || arg === '-h') {
       result.help = true;
     } else if (arg.startsWith('--')) {
-      const key = arg.slice(2);
-      const nextArg = args[i + 1];
+      let key, value;
       
-      if (nextArg && !nextArg.startsWith('--')) {
-        // Value argument
-        result[key] = nextArg;
-        i++; // Skip next arg
+      // Check if it's --key=value format
+      if (arg.includes('=')) {
+        const parts = arg.slice(2).split('=');
+        key = parts[0];
+        value = parts.slice(1).join('='); // In case value contains =
       } else {
-        // Boolean flag
-        result[key] = true;
+        // --key value format
+        key = arg.slice(2);
+        const nextArg = args[i + 1];
+        
+        if (nextArg && !nextArg.startsWith('--')) {
+          // Value argument
+          value = nextArg;
+          i++; // Skip next arg
+        } else {
+          // Boolean flag
+          value = true;
+        }
       }
+      
+      result[key] = value;
     }
   }
   
