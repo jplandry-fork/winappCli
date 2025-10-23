@@ -9,9 +9,14 @@
     <h1>💖 Hello World!</h1>
     <p>Welcome to your Electron application.</p>
     <button id="show-notification">Show Notification</button>
+    <button id="show-app-window">Show App Window from C#</button>
     <script defer>
       document.getElementById('show-notification').addEventListener('click', () => {
         window.electronAPI.showNotification('Hello', 'This is a WinRT notification from Electron!');
+      });
+      
+      document.getElementById('show-app-window').addEventListener('click', () => {
+        window.electronAPI.showAppWindow();
       });
     </script>
   </body>

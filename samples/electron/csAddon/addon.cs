@@ -42,5 +42,19 @@ namespace csAddon
         {
             return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         }
+
+        [JSExport]
+        public static void ShowAppWindow()
+        {
+            var controller = Microsoft.UI.Dispatching.DispatcherQueueController.CreateOnDedicatedThread();
+            var dispatcher = controller.DispatcherQueue;
+            dispatcher.TryEnqueue(() =>
+            {
+                var w = Microsoft.UI.Windowing.AppWindow.Create();
+                w.Title = "Hello, World!";
+                w.Show();
+            });
+            dispatcher.RunEventLoop();
+        }
     }
 }
