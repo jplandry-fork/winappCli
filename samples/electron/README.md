@@ -48,7 +48,7 @@ The sample is a default Electron Forge generated application with the following 
 
 2. **Generated a native addon** using `npx winsdk node create-addon` to call APIs from the Windows SDK and Windows App SDK. The addon folder contains the generated addon alongside the `build-addon` script added to `package.json`. The addon contains a function to raise a Windows notification, and the JavaScript code has been modified to call this function.
 
-3. **Generated a C# addon** using `npx winsdk node create-addon --template=cs`.  This generates a simple c# addon using the node-api-dotnet project.  When you build the C# addon, this will use NAOT to produce
+3. **Generated a C# addon** using `npx winsdk node create-addon --template cs`.  This generates a simple c# addon using the node-api-dotnet project.  When you build the C# addon, this will use NAOT to produce
 a .node file that is trimmed and doesn't require the .net runtime to be installed on the target machine.
 
 4. **Modified `forge.config.js`** to ignore the `.winsdk`, `devcert.pfx`, and `winsdk.yaml` files from the final package, and to copy the `appxmanifest.xml` and `Assets` folder to the final package.

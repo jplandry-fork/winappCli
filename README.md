@@ -121,7 +121,7 @@ You can also use C#:
 
 ```bash
 # Create a C# node add-on
-npx winsdk node create-addon --template=cs --name myCsAddon
+npx winsdk node create-addon --template cs --name myCsAddon
 ```
 
 This will create a .csproj file with a .cs file you can call from your Javascript using the node-api-dotnet

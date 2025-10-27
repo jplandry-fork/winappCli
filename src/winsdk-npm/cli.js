@@ -173,7 +173,7 @@ async function handleNode(args) {
     console.log('Examples:');
     console.log(`  ${CLI_NAME} node create-addon --help`);
     console.log(`  ${CLI_NAME} node create-addon --name myAddon`);
-    console.log(`  ${CLI_NAME} node create-cs-addon --name myCsAddon --template cs`);
+    console.log(`  ${CLI_NAME} node create-addon --name myCsAddon --template cs`);
     console.log(`  ${CLI_NAME} node add-electron-debug-identity`);
     console.log('');
     console.log(`Use "${CLI_NAME} node <subcommand> --help" for detailed help on each subcommand.`);
@@ -229,7 +229,7 @@ async function handleCreateAddon(args) {
     console.log('Examples:');
     console.log(`  ${CLI_NAME} node create-addon`);
     console.log(`  ${CLI_NAME} node create-addon --name myAddon`);
-    console.log(`  ${CLI_NAME} node create-addon --template=cs --name MyCsAddon`);
+    console.log(`  ${CLI_NAME} node create-addon --template cs --name MyCsAddon`);
     console.log('');
     console.log('Note: This command must be run from the root of an Electron project');
     console.log('      (directory containing package.json)');
@@ -256,8 +256,9 @@ async function handleCreateAddon(args) {
       console.log(`📁 ${result.addonPath}`);
       console.log('');
       console.log(`Next steps:`);
-      console.log(`  1. npm run build-${result.addonName}`);
-      console.log(`  2. See ${result.addonName}/README.md for usage examples`);
+      console.log(`  1. ${CLI_NAME} restore`);
+      console.log(`  2. npm run build-${result.addonName}`);
+      console.log(`  3. See ${result.addonName}/README.md for usage examples`);
     } else {
       // Use C++ addon generator (existing)
       result = await generateAddonFiles({
@@ -324,29 +325,17 @@ function parseArgs(args, defaults = {}) {
     if (arg === '--help' || arg === '-h') {
       result.help = true;
     } else if (arg.startsWith('--')) {
-      let key, value;
+      const key = arg.slice(2);
+      const nextArg = args[i + 1];
       
-      // Check if it's --key=value format
-      if (arg.includes('=')) {
-        const parts = arg.slice(2).split('=');
-        key = parts[0];
-        value = parts.slice(1).join('='); // In case value contains =
+      if (nextArg && !nextArg.startsWith('--')) {
+        // Value argument
+        result[key] = nextArg;
+        i++; // Skip next arg
       } else {
-        // --key value format
-        key = arg.slice(2);
-        const nextArg = args[i + 1];
-        
-        if (nextArg && !nextArg.startsWith('--')) {
-          // Value argument
-          value = nextArg;
-          i++; // Skip next arg
-        } else {
-          // Boolean flag
-          value = true;
-        }
+        // Boolean flag
+        result[key] = true;
       }
-      
-      result[key] = value;
     }
   }
   
