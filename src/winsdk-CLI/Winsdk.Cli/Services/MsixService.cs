@@ -64,6 +64,8 @@ internal partial class MsixService(
     private static partial Regex AppxPackageApplicationsTagRegex();
     [GeneratedRegex(@"(\s*</Dependencies>)", RegexOptions.IgnoreCase, "en-US")]
     private static partial Regex AppxPackageDependenciesCloseTagRegex();
+    [GeneratedRegex(@"<assemblyIdentity[^>]*name\s*=\s*[""']([^""']*)[""']", RegexOptions.IgnoreCase, "en-US")]
+    private static partial Regex AssemblyIdentityNameRegex();
 
     /// <summary>
     /// Sets up Windows App SDK for self-contained deployment by extracting MSIX content
@@ -280,6 +282,33 @@ internal partial class MsixService(
     private async Task EmbedMsixIdentityToExeAsync(string exePath, MsixIdentityResult identityInfo, string? applicationLocation, CancellationToken cancellationToken)
     {
         // Create the MSIX element for the win32 manifest
+        string assemblyIdentity = $@"<assemblyIdentity version=""1.0.0.0"" name=""{SecurityElement.Escape(identityInfo.PackageName)}"" type=""win32""/>;";
+        var workingDir = applicationLocation ?? Path.GetDirectoryName(exePath)!;
+        var existingManifestPath = Path.Combine(workingDir, "temp_extracted.manifest");
+
+        try
+        {
+            bool hasExistingManifest = await TryExtractManifestFromExeAsync(exePath, existingManifestPath, cancellationToken);
+            if (!hasExistingManifest)
+            {
+                assemblyIdentity = string.Empty;
+            }
+            else
+            {
+                logger.LogDebug("Existing manifest found in executable, checking for AssemblyIdentity...");
+                var existingManifestContent = await File.ReadAllTextAsync(existingManifestPath, Encoding.UTF8, cancellationToken);
+                var assemblyIdentityMatch = AssemblyIdentityNameRegex().Match(existingManifestContent);
+                if (assemblyIdentityMatch.Success)
+                {
+                    logger.LogDebug("Existing AssemblyIdentity found in manifest, will not add a new one.");
+                    assemblyIdentity = string.Empty;
+                }
+            }
+        }
+        finally
+        {
+            TryDeleteFile(existingManifestPath);
+        }
 
         var manifestContent = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
 <assembly xmlns=""urn:schemas-microsoft-com:asm.v1"" manifestVersion=""1.0"">
@@ -288,11 +317,10 @@ internal partial class MsixService(
             packageName=""{SecurityElement.Escape(identityInfo.PackageName)}""
             applicationId=""{SecurityElement.Escape(identityInfo.ApplicationId)}""
         />
-  <assemblyIdentity version=""1.0.0.0"" name=""{SecurityElement.Escape(identityInfo.PackageName)}"" type=""win32""/>
+    {assemblyIdentity}
 </assembly>";
 
         // Create a temporary manifest file
-        var workingDir = applicationLocation ?? Path.GetDirectoryName(exePath)!;
         var tempManifestPath = Path.Combine(workingDir, "msix_identity_temp.manifest");
 
         try
@@ -341,19 +369,7 @@ internal partial class MsixService(
 
         try
         {
-            logger.LogDebug("Extracting current manifest from executable...");
-
-            // Extract current manifest from the executable
-            bool hasExistingManifest = false;
-            try
-            {
-                await RunMtToolAsync($@"-inputresource:""{exePath}"";#1 -out:""{tempManifestPath}""", cancellationToken);
-                hasExistingManifest = File.Exists(tempManifestPath);
-            }
-            catch
-            {
-                logger.LogDebug("No existing manifest found in executable");
-            }
+            bool hasExistingManifest = await TryExtractManifestFromExeAsync(exePath, tempManifestPath, cancellationToken);
 
             if (hasExistingManifest)
             {
@@ -387,6 +403,25 @@ internal partial class MsixService(
             TryDeleteFile(tempManifestPath);
             TryDeleteFile(mergedManifestPath);
         }
+    }
+
+    private async Task<bool> TryExtractManifestFromExeAsync(string exePath, string tempManifestPath, CancellationToken cancellationToken)
+    {
+        logger.LogDebug("Extracting current manifest from executable...");
+
+        // Extract current manifest from the executable
+        bool hasExistingManifest = false;
+        try
+        {
+            await RunMtToolAsync($@"-inputresource:""{exePath}"";#1 -out:""{tempManifestPath}""", cancellationToken);
+            hasExistingManifest = File.Exists(tempManifestPath);
+        }
+        catch
+        {
+            logger.LogDebug("No existing manifest found in executable");
+        }
+
+        return hasExistingManifest;
     }
 
     /// <summary>
@@ -676,7 +711,7 @@ internal partial class MsixService(
         }
 
         // If manifest is outside input folder, copy it and any related assets into input folder
-        if (!string.IsNullOrEmpty(resolvedManifestPath) && !inputFolder.Equals(Path.GetDirectoryName(resolvedManifestPath), StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrEmpty(resolvedManifestPath) && !Path.GetFullPath(inputFolder).Equals(Path.GetFullPath(Path.GetDirectoryName(resolvedManifestPath)!), StringComparison.OrdinalIgnoreCase))
         {
             await CopyAllAssetsAsync(resolvedManifestPath, inputFolder, cancellationToken);
         }
