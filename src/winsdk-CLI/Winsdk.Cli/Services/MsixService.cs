@@ -1769,9 +1769,12 @@ $1");
     /// <param name="cancellationToken">Cancellation token</param>
     public async Task RegisterSparsePackageAsync(string manifestPath, string externalLocation, CancellationToken cancellationToken = default)
     {
+        var manifestFullPath = Path.GetFullPath(manifestPath);
+        var absoluteExternalLocation = Path.GetFullPath(externalLocation);
+
         logger.LogDebug("{UISymbol} Registering sparse package with external location...", UiSymbols.Clipboard);
 
-        var registerCommand = $"Add-AppxPackage -Path '{manifestPath}' -ExternalLocation '{externalLocation}' -Register -ForceUpdateFromAnyVersion";
+        var registerCommand = $"Add-AppxPackage -Path '{manifestFullPath}' -ExternalLocation '{absoluteExternalLocation}' -Register -ForceUpdateFromAnyVersion";
 
         try
         {
