@@ -174,6 +174,17 @@ This project has adopted the [Microsoft Open Source Code of Conduct](https://ope
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
+To build the CLI:
+```
+# Build the CLI and package for npm from repo root
+.\scripts\build-cli.ps1
+```
+
+To consume the CLI you built from a local test project:
+```
+npm install --save-dev <winsdk-repo-root>\artifacts\microsoft-winsdk-<version-string>.tgz
+```
+
 ## Trademarks
 
 This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
