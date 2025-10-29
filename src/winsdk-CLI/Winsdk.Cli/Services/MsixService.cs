@@ -1271,7 +1271,7 @@ internal partial class MsixService(
         if (entryPointPath != null)
         {
             // Replace executable path with relative path from package root
-            var workingDir = baseDirectory ?? Directory.GetCurrentDirectory();
+            var workingDir = baseDirectory ?? Path.GetDirectoryName(entryPointPath) ?? Directory.GetCurrentDirectory();
             string relativeExecutablePath;
 
             try
