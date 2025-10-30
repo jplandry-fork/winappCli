@@ -18,7 +18,7 @@ After building, you can use the addon in your JavaScript code:
 
 ```javascript
 // Load the C# module
-const {AddonName} = require('./{AddonName}/build/Release/{AddonName}');
+const {AddonName} = require('./{AddonName}/dist/{AddonName}.node');
 
 // Call exported methods (note: C# method names are converted to camelCase in JavaScript)
 console.log({AddonName}.Addon.hello('World'));

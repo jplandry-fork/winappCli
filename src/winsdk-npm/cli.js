@@ -256,7 +256,7 @@ async function handleCreateAddon(args) {
       console.log(`📁 ${result.addonPath}`);
       console.log('');
       console.log(`Next steps:`);
-      console.log(`  1. ${CLI_NAME} restore`);
+      console.log(`  1. npx ${CLI_NAME} restore`);
       console.log(`  2. npm run build-${result.addonName}`);
       console.log(`  3. See ${result.addonName}/README.md for usage examples`);
     } else {

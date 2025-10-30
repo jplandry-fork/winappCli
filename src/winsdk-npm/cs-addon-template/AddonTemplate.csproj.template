@@ -14,7 +14,7 @@
     <!-- Allows us to run dotnet publish to generate an AOT .node file that doesn't depend on the .net runtime -->
     <PublishAot>true</PublishAot>
     <PublishNodeModule>true</PublishNodeModule>
-    <PublishDir>build\Release</PublishDir>
+    <PublishDir>dist</PublishDir>
   </PropertyGroup>
 
   <ItemGroup>

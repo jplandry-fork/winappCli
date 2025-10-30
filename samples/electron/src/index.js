@@ -3,11 +3,11 @@ const path = require('node:path');
 
 const addon = require('../addon/build/Release/addon.node');
 
-var csAddon = undefined; 
+let csAddon = undefined; 
 
 function getCsAddon() {
   if (csAddon === undefined) {
-    csAddon = require('../csAddon/build/Release/csAddon.node');
+    csAddon = require('../csAddon/dist/csAddon.node');
   }
   return csAddon;
 }
