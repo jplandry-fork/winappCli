@@ -52,7 +52,7 @@ if(NOT WINAPP_CLI)
     vcpkg_execute_required_process(
         ALLOW_IN_DOWNLOAD_MODE
         COMMAND powershell -NoProfile -Command "try {
-            $r = Invoke-RestMethod -Uri 'https://api.github.com/repos/microsoft/WindowsDevCLI/releases/latest' -Headers @{ 'User-Agent' = 'winapp-vcpkg' }
+            $r = Invoke-RestMethod -Uri 'https://api.github.com/repos/microsoft/WinAppCli/releases/latest' -Headers @{ 'User-Agent' = 'winapp-vcpkg' }
             $asset = $r.assets |
             Where-Object {
                 $_.name -match '${WINAPP_RUNTIME_ARCH}' -and

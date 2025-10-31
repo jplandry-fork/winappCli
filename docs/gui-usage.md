@@ -25,7 +25,7 @@ The Windows Development CLI **must** be in your [PATH](#adding-to-path) for the 
 
 ## Install the GUI Tool
 
-1. **[👉 Download Latest Experimental Build (unsigned .msix)](https://github.com/microsoft/WindowsDevCli/releases/latest)**
+1. **[👉 Download Latest Experimental Build (unsigned .msix)](https://github.com/microsoft/WinAppCli/releases/latest)**
 2. Run Powershell as **Administrator** and `Add-AppPackage -Path <msix> -AllowUnsigned`
 
 `<msix>` should be replaced with the full path of the downloaded build (msix file).
@@ -36,7 +36,7 @@ Alternatively, you can clone and build this repository. Run Identity.GUI.Experim
 
 Please note that this app is experimental and may have issues as we gather feedback on the functionality, usefulness and value of the UI-based solution. If you see value or issues in this app, please let us know:
 
-- [File an issue](https://github.com/microsoft/WindowsDevCLI/issues): please ensure that you are not filing a duplicate issue or bug
+- [File an issue](https://github.com/microsoft/WinAppCli/issues): please ensure that you are not filing a duplicate issue or bug
 - Send any feedback to <windowsdevelopertoolkit@microsoft.com>: Do you love this tool? Are there features or fixes you want to see? Let us know!
 
 The app will add functionality for Electron and mirror the CLI going forward depending on user feedback.

@@ -38,4 +38,4 @@ If you see a script execution error, Right-click `install.ps1` â†’ Properties â†
 
 ## Support
 
-For more information, visit: https://github.com/microsoft/WindowsDevCLI
+For more information, visit: https://github.com/microsoft/WinAppCli

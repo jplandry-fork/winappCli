@@ -39,7 +39,7 @@ Perfect for:
 
 The easiest way to use the CLI is to download automated nightly build from GitHub Releases.
 
-**[👉 Download Latest Build](https://github.com/microsoft/windowsdevcli/releases/latest)**
+**[👉 Download Latest Build](https://github.com/microsoft/WinAppCli/releases/latest)**
 
 **Available Options:**
 
@@ -101,7 +101,7 @@ The full CLI usage can be found here: [Documentation](/docs/usage.md)
 
 ## 🔧 Feedback
 
-- [File an issue, feature request or bug](https://github.com/microsoft/WindowsDevCLI/issues): please ensure that you are not filing a duplicate issue
+- [File an issue, feature request or bug](https://github.com/microsoft/WinAppCli/issues): please ensure that you are not filing a duplicate issue
 - Send feedback to <windowsdevelopertoolkit@microsoft.com>: Do you love this tool? Are there features or fixes you want to see? Let us know!
 
 We are actively working on improving Node and Python support. These features are currently experimental and we are aware of several issues with these app types.
