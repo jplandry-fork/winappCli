@@ -173,7 +173,6 @@ winsdk create-debug-identity [entrypoint] [options]
 
 - `--manifest <path>` - Path to AppxManifest.xml (default: `./appxmanifest.xml`)
 - `--no-install` - Don't install the package after creation
-- `--location <path>` - Root path of the application (default: parent directory of executable)
 
 **What it does:**
 
@@ -357,7 +356,7 @@ winsdk get-winsdk-path [options]
 
 ### node create-addon
 
-*(Node.js/Electron only)* Generate native C++ addon templates with Windows SDK integration.
+*(Available in NPM package only)* Generate native C++ or C# addon templates with Windows SDK and Windows App SDK integration.
 
 ```bash
 npx winsdk node create-addon [options]
@@ -366,6 +365,7 @@ npx winsdk node create-addon [options]
 **Options:**
 
 - `--name <name>` - Addon name (default: "nativeWindowsAddon")
+- `--template` - Select type of addon. Options are `cs` or `cpp`
 - `--verbose` - Enable verbose output
 
 **What it does:**

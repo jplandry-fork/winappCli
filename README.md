@@ -18,7 +18,9 @@
   <a href="#feedback">Feedback</a>
 </h3>
 <br/><br/>
-The Windows Development CLI bridges the gap between cross-platform development and Windows-native capabilities, while also making packaging and app identity a "one-click" implementation.
+
+The Windows Development CLI is a single command line interface for managing Windows SDKs, packaging, generating app identity, manifests, certificates and using build tools with any app framework. This tool bridges the gap between cross-platform development and Windows-native capabilities.
+
 <br/><br/>
 
 Whether you're building with Electron, .NET/Win32, CMake or Python, this CLI gives you access to:
@@ -27,6 +29,7 @@ Whether you're building with Electron, .NET/Win32, CMake or Python, this CLI giv
 - **App Identity** - Debug and test by adding app identity without full packaging in a snap
 - **MSIX Packaging** -  App packaging with signing and Store readiness
 - **Developer Tools** - Manifests, certificates, assets, and build integration
+
 <br/><br/>
 
 Perfect for:
@@ -34,6 +37,7 @@ Perfect for:
 - **Electron/cross-platform developers** wanting native Windows features or targeting Windows
 - **Developers testing and deploying** adding app identity for development or packaging for deployment
 - **CI/CD pipelines** automating Windows app builds
+
 </div>
 
 ## 📦 Installation
@@ -57,7 +61,7 @@ Windows Search → Edit the system environment variables → Environment Variabl
 
 ## 📋 Usage
 
-Once installed (see [Installation](#installation) above), verify the installation by calling the CLI:
+Once installed (see [Installation](#-installation) above), verify the installation by calling the CLI:
 
 ```bash
 winsdk --help
@@ -102,12 +106,14 @@ The full CLI usage can be found here: [Documentation](/docs/usage.md)
 
 ## 🔧 Feedback
 
+- [File an issue, feature request or bug](https://github.com/microsoft/WindowsDevCLI/issues): please ensure that you are not filing a duplicate issue
 - Send feedback to <windowsdevelopertoolkit@microsoft.com>: Do you love this tool? Are there features or fixes you want to see? Let us know!
-- [File a bug](https://github.com/microsoft/WindowsDevCLI/issues): please ensure that you are not filing a duplicate issue
 
-## 🧪 Windows Identity Tool
+We are actively working on improving Node and Python support. These features are currently experimental and we are aware of several issues with these app types.
 
-We are also shipping an **experimental** app (GUI) that wraps the CLI and provides an intuitive, drag-and-drop experience with the following features. See the docs here: [GUI Documentation](/docs/gui-usage.md)
+## 🧪 Try the Windows Identity App
+
+This repository also contains an **experimental** app (GUI) that wraps the CLI and provides an intuitive, drag-and-drop experience. [See the docs](/docs/gui-usage.md) for more details.
 
 ## Contributing
 
