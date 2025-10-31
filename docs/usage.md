@@ -57,7 +57,6 @@ winapp restore [options]
 **Options:**
 
 - `--config-dir <path>` - Directory containing winapp.yaml (default: current directory)
-- `--prerelease` - Include prerelease packages from NuGet
 
 **What it does:**
 
@@ -109,12 +108,12 @@ winapp update --prerelease
 
 ---
 
-### package
+### pack
 
-Create MSIX packages from prepared application directories. Requires Appxmanifest file to be present in the directory (run `init` or `manifest generate` to create a manifest)
+Create MSIX packages from prepared application directories. Requires appxmanifest.xml file to be present in the target dirrectory, in the current directory, or passed with the `--manifest` option. (run `init` or `manifest generate` to create a manifest)
 
 ```bash
-winapp package <input-folder> [options]
+winapp pack <input-folder> [options]
 ```
 
 **Arguments:**
@@ -146,13 +145,13 @@ winapp package <input-folder> [options]
 
 ```bash
 # Package directory with auto-detected manifest
-winapp package ./dist
+winapp pack ./dist
 
 # Package with custom output name and certificate
-winapp package ./dist --output MyApp.msix --cert ./cert.pfx
+winapp pack ./dist --output MyApp.msix --cert ./cert.pfx
 
-# Package with generated and installed certificate and self-contained runtime
-winapp package ./dist --generate-cert --install-cert --self-contained
+# Package with generated and installed certificate and self-contained winAppSDK runtime
+winapp pack ./dist --generate-cert --install-cert --self-contained
 ```
 
 ---
@@ -249,7 +248,7 @@ Generate and install development certificates.
 
 #### cert generate
 
-Generate development certificates for code signing.
+Generate development certificates for package signing.
 
 ```bash
 winapp cert generate [options]
@@ -257,9 +256,13 @@ winapp cert generate [options]
 
 **Options:**
 
+- `--manifest <appxmanifest.xml>` - Extract publisher information from appxmanifest.xml 
 - `--publisher <name>` - Publisher name for certificate
 - `--output <path>` - Output certificate file path
 - `--password <password>` - Certificate password (default: "password")
+- `--valid-days <valid-days>` - Number of days the certificate is valid (default: 365)
+- `--install` - Install the certificate to the local machine store after generation
+- `--if-exists <Error|Overwrite|Skip>` - Set behavior if the certificate file already exists [default: Error]
 
 #### cert install
 
@@ -316,7 +319,7 @@ winapp sign ./bin/MyApp.exe --cert ./mycert.pfx --cert-password mypassword
 
 ### tool
 
-Access Windows SDK tools directly.
+Access Windows SDK tools directly. Uses tools available in [Microsoft.Windows.SDK.BuildTools](https://www.nuget.org/packages/Microsoft.Windows.SDK.BuildTools/)
 
 ```bash
 winapp tool <tool-name> [tool-arguments]
@@ -327,7 +330,7 @@ winapp tool <tool-name> [tool-arguments]
 - `makeappx` - Create and manipulate app packages
 - `signtool` - Sign files and verify signatures
 - `mt` - Manifest tool for side-by-side assemblies
-- And other Windows SDK tools
+- And other Windows SDK tools from [Microsoft.Windows.SDK.BuildTools](https://www.nuget.org/packages/Microsoft.Windows.SDK.BuildTools/)
 
 **Examples:**
 
@@ -389,7 +392,12 @@ npx winapp node create-addon --name myWindowsAddon
 
 ### node add-electron-debug-identity
 
-*(Node.js/Electron only)* Add app identity to Electron development process.
+*(Available in NPM package only)* Add app identity to Electron development process by using sparse packaging. Requires an appxmanifest.xml (create one with `winapp init` or `winapp manifest generate` if you don't have one)
+
+> [!IMPORTANT]  
+> There is a known issue with sparse packaging Electron applications which causes the app to crash on start or not render the web content. The issue has been fixed in Windows but it has not propagated to external Windows devices yet. If you are seeing this issue after calling `add-electron-debug-identity`, you can [disable sandboxing in your Electron app](https://www.electronjs.org/docs/latest/tutorial/sandbox#disabling-chromiums-sandbox-testing-only) for debug purposes with the `--no-sandbox` flag. This issue does not affect full MSIX packaging.
+<br /><br />
+To undo the electron debug identity, the easiest is to clear your node modules folder (or just the electron folder) and `npm install` again
 
 ```bash
 npx winapp node add-electron-debug-identity [options]

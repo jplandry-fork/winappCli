@@ -18,7 +18,11 @@
   <a href="#-feedback">Feedback</a>
 </h3>
 <br/><br/>
-The Windows Development CLI is a single command line interface for managing Windows SDKs, packaging, generating app identity, manifests, certificates and using build tools with any app framework. This tool bridges the gap between cross-platform development and Windows-native capabilities.
+
+> [!IMPORTANT]  
+> The Windows App Development CLI is in priview and in active development, and we’d love your feedback! Share your thoughts by creating an [issue](https://github.com/microsoft/WinAppCli/issues).
+
+The Windows App Development CLI is a single command line interface for managing Windows SDKs, packaging, generating app identity, manifests, certificates and using build tools with any app framework. This tool bridges the gap between cross-platform development and Windows-native capabilities.
 <br/><br/>
 Whether you're building with Electron, .NET/Win32, CMake or Python, this CLI gives you access to:
 
