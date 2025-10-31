@@ -13,24 +13,19 @@
   <span> . </span>
   <a href="./docs/usage.md">Documentation</a>
   <span> . </span>
-  <a href="#-windows-identity-tool">GUI</a>
+  <a href="#-try-the-windows-identity-app">GUI</a>
   <span> . </span>
-  <a href="#feedback">Feedback</a>
+  <a href="#-feedback">Feedback</a>
 </h3>
 <br/><br/>
-
 The Windows Development CLI is a single command line interface for managing Windows SDKs, packaging, generating app identity, manifests, certificates and using build tools with any app framework. This tool bridges the gap between cross-platform development and Windows-native capabilities.
-
 <br/><br/>
-
 Whether you're building with Electron, .NET/Win32, CMake or Python, this CLI gives you access to:
 
 - **Modern Windows APIs** - Windows App SDK and Windows SDK with automatic setup and code generation
 - **App Identity** - Debug and test by adding app identity without full packaging in a snap
 - **MSIX Packaging** -  App packaging with signing and Store readiness
 - **Developer Tools** - Manifests, certificates, assets, and build integration
-
-<br/><br/>
 
 Perfect for:
 
