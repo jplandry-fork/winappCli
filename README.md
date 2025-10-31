@@ -39,33 +39,33 @@ Perfect for:
 
 The easiest way to use the CLI is to download automated nightly build from GitHub Releases.
 
-**[👉 Download Latest Build](https://github.com/microsoft/winsdk/releases/latest)**
+**[👉 Download Latest Build](https://github.com/microsoft/windowsdevcli/releases/latest)**
 
 **Available Options:**
 
 | Package | Description | Use Case |
 |---------|-------------|----------|
 | **`binaries-[version].zip`** | 📦 Standalone Binaries | Portable, no install needed - great for CI/CD |
-| **`microsoft-winsdk-[version].tgz`** | 📚 NPM Package | For Node.js/Electron projects |
+| **`microsoft-winappcli-[version].tgz`** | 📚 NPM Package | For Node.js/Electron projects |
 
 ### Adding to Path
 
 The easiest way to use the CLI globally is to add it to the PATH. **Add to Path**:
 
-Windows Search → Edit the system environment variables → Environment Variables → Path → Edit → New → Add the location (folder) of WinSdk.cli.exe
+Windows Search → Edit the system environment variables → Environment Variables → Path → Edit → New → Add the location (folder) of winapp.exe
 
 ## 📋 Usage
 
 Once installed (see [Installation](#-installation) above), verify the installation by calling the CLI:
 
 ```bash
-winsdk --help
+winapp --help
 ```
 
 or if using Electron/NodeJS
 
 ```bash
-npx winsdk --help
+npx winapp --help
 ```
 
 ### Commands Overview
@@ -90,7 +90,7 @@ npx winsdk --help
 **Development Tools:**
 
 - [`tool`](./docs/usage.md#tool) - Access Windows SDK tools
-- [`get-winsdk-path`](./docs/usage.md#get-winsdk-path) - Get paths to installed SDK components
+- [`get-winapp-path`](./docs/usage.md#get-winapp-path) - Get paths to installed SDK components
 
 **Node.js/Electron Specific:**
 
