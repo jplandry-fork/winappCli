@@ -25,7 +25,7 @@ The Windows Development CLI **must** be in your [PATH](#adding-to-path) for the 
 
 ## Install the GUI Tool
 
-1. **[👉 Download Latest Experimental Build (unsigned .msix)](https://github.com/microsoft/winsdk/releases/latest)**
+1. **[👉 Download Latest Experimental Build (unsigned .msix)](https://github.com/microsoft/WindowsDevCli/releases/latest)**
 2. Run Powershell as **Administrator** and `Add-AppPackage -Path <msix> -AllowUnsigned`
 
 `<msix>` should be replaced with the full path of the downloaded build (msix file).

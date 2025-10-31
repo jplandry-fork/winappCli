@@ -205,4 +205,4 @@ devcert.pfx
 *.msix
 
 # GUI app package outputs
-/src/winsdk-CLI/Identity.GUI.Experimental/AppPackages
+/src/winapp-CLI/Identity.GUI.Experimental/AppPackages

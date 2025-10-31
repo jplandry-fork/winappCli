@@ -5,12 +5,12 @@
 Initialize a directory with Windows SDK, Windows App SDK, and required assets for modern Windows development.
 
 ```bash
-winsdk init [base-directory] [options]
+winapp init [base-directory] [options]
 ```
 
 **Arguments:**
 
-- `base-directory` - Base/root directory for the winsdk workspace (default: current directory)
+- `base-directory` - Base/root directory for the app/workspace (default: current directory)
 
 **Options:**
 
@@ -24,7 +24,7 @@ winsdk init [base-directory] [options]
 
 **What it does:**
 
-- Creates `winsdk.yaml` configuration file
+- Creates `winapp.yaml` configuration file
 - Downloads Windows SDK and Windows App SDK packages
 - Generates C++/WinRT headers and binaries
 - Creates development certificate and AppxManifest.xml
@@ -35,44 +35,44 @@ winsdk init [base-directory] [options]
 
 ```bash
 # Initialize current directory
-winsdk init
+winapp init
 
 # Initialize with prerelease packages
-winsdk init --prerelease
+winapp init --prerelease
 
 # Initialize specific directory with auto-yes
-winsdk init ./my-project --yes
+winapp init ./my-project --yes
 ```
 
 ---
 
 ### restore
 
-Restore packages and regenerate files based on existing `winsdk.yaml` configuration.
+Restore packages and regenerate files based on existing `winapp.yaml` configuration.
 
 ```bash
-winsdk restore [options]
+winapp restore [options]
 ```
 
 **Options:**
 
-- `--config-dir <path>` - Directory containing winsdk.yaml (default: current directory)
+- `--config-dir <path>` - Directory containing winapp.yaml (default: current directory)
 - `--prerelease` - Include prerelease packages from NuGet
 
 **What it does:**
 
-- Reads existing `winsdk.yaml` configuration
+- Reads existing `winapp.yaml` configuration
 - Downloads/updates SDK packages to specified versions
 - Regenerates C++/WinRT headers and binaries
 
 **Examples:**
 
 ```bash
-# Restore from winsdk.yaml in current directory
-winsdk restore
+# Restore from winapp.yaml in current directory
+winapp restore
 
 # Restore with prerelease packages
-winsdk restore --prerelease
+winapp restore --prerelease
 ```
 
 ---
@@ -82,29 +82,29 @@ winsdk restore --prerelease
 Update packages to their latest versions and update the configuration file.
 
 ```bash
-winsdk update [options]
+winapp update [options]
 ```
 
 **Options:**
 
-- `--config-dir <path>` - Directory containing winsdk.yaml (default: current directory)
+- `--config-dir <path>` - Directory containing winapp.yaml (default: current directory)
 - `--prerelease` - Include prerelease packages from NuGet
 
 **What it does:**
 
-- Reads existing `winsdk.yaml` configuration
+- Reads existing `winapp.yaml` configuration
 - Updates all packages to their latest available versions
-- Updates the `winsdk.yaml` file with new version numbers
+- Updates the `winapp.yaml` file with new version numbers
 - Regenerates C++/WinRT headers and binaries
 
 **Examples:**
 
 ```bash
 # Update packages to latest versions
-winsdk update
+winapp update
 
 # Update including prerelease packages
-winsdk update --prerelease
+winapp update --prerelease
 ```
 
 ---
@@ -114,7 +114,7 @@ winsdk update --prerelease
 Create MSIX packages from prepared application directories. Requires Appxmanifest file to be present in the directory (run `init` or `manifest generate` to create a manifest)
 
 ```bash
-winsdk package <input-folder> [options]
+winapp package <input-folder> [options]
 ```
 
 **Arguments:**
@@ -146,13 +146,13 @@ winsdk package <input-folder> [options]
 
 ```bash
 # Package directory with auto-detected manifest
-winsdk package ./dist
+winapp package ./dist
 
 # Package with custom output name and certificate
-winsdk package ./dist --output MyApp.msix --cert ./cert.pfx
+winapp package ./dist --output MyApp.msix --cert ./cert.pfx
 
 # Package with generated and installed certificate and self-contained runtime
-winsdk package ./dist --generate-cert --install-cert --self-contained
+winapp package ./dist --generate-cert --install-cert --self-contained
 ```
 
 ---
@@ -162,7 +162,7 @@ winsdk package ./dist --generate-cert --install-cert --self-contained
 Create app identity for debugging without full MSIX packaging using [external location/sparse packaging](https://learn.microsoft.com/en-us/windows/apps/desktop/modernize/grant-identity-to-nonpackaged-apps).
 
 ```bash
-winsdk create-debug-identity [entrypoint] [options]
+winapp create-debug-identity [entrypoint] [options]
 ```
 
 **Arguments:**
@@ -184,13 +184,13 @@ winsdk create-debug-identity [entrypoint] [options]
 
 ```bash
 # Add identity to executable using local manifest
-winsdk create-debug-identity ./bin/MyApp.exe
+winapp create-debug-identity ./bin/MyApp.exe
 
 # Add identity with custom manifest location
-winsdk create-debug-identity ./dist/app.exe --manifest ./custom-manifest.xml
+winapp create-debug-identity ./dist/app.exe --manifest ./custom-manifest.xml
 
 # Create identity for hosted app script
-winsdk create-debug-identity app.py
+winapp create-debug-identity app.py
 ```
 
 ---
@@ -204,7 +204,7 @@ Generate and manage AppxManifest.xml files.
 Generate AppxManifest.xml from templates.
 
 ```bash
-winsdk manifest generate [directory] [options]
+winapp manifest generate [directory] [options]
 ```
 
 **Arguments:**
@@ -232,13 +232,13 @@ winsdk manifest generate [directory] [options]
 
 ```bash
 # Generate standard manifest interactively
-winsdk manifest generate
+winapp manifest generate
 
 # Generate hosted app manifest for Python script
-winsdk manifest generate --template hostedapp --entrypoint app.py
+winapp manifest generate --template hostedapp --entrypoint app.py
 
 # Generate with all options specified
-winsdk manifest generate ./src --package-name MyApp --publisher-name "CN=My Company" --yes
+winapp manifest generate ./src --package-name MyApp --publisher-name "CN=My Company" --yes
 ```
 
 ---
@@ -252,7 +252,7 @@ Generate and install development certificates.
 Generate development certificates for code signing.
 
 ```bash
-winsdk cert generate [options]
+winapp cert generate [options]
 ```
 
 **Options:**
@@ -266,7 +266,7 @@ winsdk cert generate [options]
 Install certificate to machine certificate store.
 
 ```bash
-winsdk cert install <cert-path> [options]
+winapp cert install <cert-path> [options]
 ```
 
 **Arguments:**
@@ -277,10 +277,10 @@ winsdk cert install <cert-path> [options]
 
 ```bash
 # Generate certificate for specific publisher
-winsdk cert generate --publisher "CN=My Company" --output ./mycert.pfx
+winapp cert generate --publisher "CN=My Company" --output ./mycert.pfx
 
 # Install certificate to machine
-winsdk cert install ./mycert.pfx
+winapp cert install ./mycert.pfx
 ```
 
 ---
@@ -290,7 +290,7 @@ winsdk cert install ./mycert.pfx
 Sign MSIX packages and executables with certificates.
 
 ```bash
-winsdk sign <file-path> [options]
+winapp sign <file-path> [options]
 ```
 
 **Arguments:**
@@ -306,10 +306,10 @@ winsdk sign <file-path> [options]
 
 ```bash
 # Sign MSIX package
-winsdk sign MyApp.msix --cert ./mycert.pfx
+winapp sign MyApp.msix --cert ./mycert.pfx
 
 # Sign executable
-winsdk sign ./bin/MyApp.exe --cert ./mycert.pfx --cert-password mypassword
+winapp sign ./bin/MyApp.exe --cert ./mycert.pfx --cert-password mypassword
 ```
 
 ---
@@ -319,7 +319,7 @@ winsdk sign ./bin/MyApp.exe --cert ./mycert.pfx --cert-password mypassword
 Access Windows SDK tools directly.
 
 ```bash
-winsdk tool <tool-name> [tool-arguments]
+winapp tool <tool-name> [tool-arguments]
 ```
 
 **Available tools:**
@@ -333,22 +333,22 @@ winsdk tool <tool-name> [tool-arguments]
 
 ```bash
 # Use signtool to verify signature
-winsdk tool signtool verify /pa MyApp.msix
+winapp tool signtool verify /pa MyApp.msix
 ```
 
 ---
 
-### get-winsdk-path
+### get-winapp-path
 
 Get paths to installed Windows SDK components.
 
 ```bash
-winsdk get-winsdk-path [options]
+winapp get-winapp-path [options]
 ```
 
 **What it returns:**
 
-- Paths to `.winsdk` workspace directory
+- Paths to `.winapp` workspace directory
 - Package installation directories
 - Generated header locations
 
@@ -359,7 +359,7 @@ winsdk get-winsdk-path [options]
 *(Available in NPM package only)* Generate native C++ or C# addon templates with Windows SDK and Windows App SDK integration.
 
 ```bash
-npx winsdk node create-addon [options]
+npx winapp node create-addon [options]
 ```
 
 **Options:**
@@ -379,10 +379,10 @@ npx winsdk node create-addon [options]
 
 ```bash
 # Generate addon with default name
-npx winsdk node create-addon
+npx winapp node create-addon
 
 # Generate custom named addon
-npx winsdk node create-addon --name myWindowsAddon
+npx winapp node create-addon --name myWindowsAddon
 ```
 
 ---
@@ -392,7 +392,7 @@ npx winsdk node create-addon --name myWindowsAddon
 *(Node.js/Electron only)* Add app identity to Electron development process.
 
 ```bash
-npx winsdk node add-electron-debug-identity [options]
+npx winapp node add-electron-debug-identity [options]
 ```
 
 **What it does:**
@@ -405,7 +405,7 @@ npx winsdk node add-electron-debug-identity [options]
 
 ```bash
 # Add identity to Electron development process
-npx winsdk node add-electron-debug-identity
+npx winapp node add-electron-debug-identity
 ```
 
 ---
