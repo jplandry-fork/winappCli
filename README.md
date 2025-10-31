@@ -98,7 +98,7 @@ npx winapp --help
 
 **Node.js/Electron Specific:**
 
-- [`node create-addon`](./docs/usage.md#node-create-addon) - Generate native C++ addons
+- [`node create-addon`](./docs/usage.md#node-create-addon) - Generate native C# or C++ addons
 - [`node add-electron-debug-identity`](./docs/usage.md#node-add-electron-debug-identity) - Add identity to Electron processes
 
 The full CLI usage can be found here: [Documentation](/docs/usage.md)
@@ -113,16 +113,6 @@ We are actively working on improving Node and Python support. These features are
 ## 🧪 Try the Windows Identity App
 
 This repository also contains an **experimental** app (GUI) that wraps the CLI and provides an intuitive, drag-and-drop experience. [See the docs](/docs/gui-usage.md) for more details.
-
-You can also use C#:
-
-```bash
-# Create a C# node add-on
-npx winapp node create-addon --template cs --name myCsAddon
-```
-
-This will create a .csproj file with a .cs file you can call from your Javascript using the node-api-dotnet
-package.  (This package will also be installed when you run the create-addon command)
 
 ## Contributing
 
@@ -140,14 +130,11 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 
 To build the CLI:
 ```
-# Build the CLI and package for npm from repo root
+# Build the CLI and package for npm from the repo root
 .\scripts\build-cli.ps1
 ```
 
-To consume the CLI you built from a local test project:
-```
-npm install --save-dev <winapp-repo-root>\artifacts\microsoft-winapp-<version-string>.tgz
-```
+The binaries and packages will be placed in the `artifacts` folder
 
 ## Trademarks
 
