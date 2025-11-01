@@ -103,6 +103,7 @@ extends:
         displayName: GitHub Pre-release
         templateContext:
           type: releaseJob
+          isProduction: true
           inputs:
           - input: pipelineArtifact
             artifactName: cli-binaries
