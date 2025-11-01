@@ -72,32 +72,24 @@ extends:
               signingIdentity: ${{ parameters.signingIdentity }}
           - task: PowerShell@2
             name: SetMeta
-            displayName: Build + compute versions
+            displayName: Export version
             inputs:
               targetType: inline
               script: |
                 # Get version info
                 $versionJson = Get-Content "version.json" | ConvertFrom-Json
                 $baseVersion = $versionJson.version
-                $buildNumber = & ".\scripts\get-build-number.ps1"
-                $fullVersion = "$baseVersion-prerelease.$buildNumber"
+                $fullVersion = "$baseVersion"
 
-                Write-Host "BaseVersion: $baseVersion"
-                Write-Host "BuildNumber: $buildNumber"
-                Write-Host "FullVersion: $fullVersion"
+                Write-Host "Version: $fullVersion"
 
-                # Export as **output variables** for other stages/jobs
                 Write-Host "##vso[task.setvariable variable=version;isOutput=true]$fullVersion"
-                Write-Host "##vso[task.setvariable variable=base_version;isOutput=true]$baseVersion"
-                Write-Host "##vso[task.setvariable variable=build_number;isOutput=true]$buildNumber"
 
     - stage: Release
       displayName: Create GitHub Pre-release
       dependsOn: Build
       variables:
-        version:       $[ stageDependencies.Build.Build.outputs['SetMeta.version'] ]
-        base_version:  $[ stageDependencies.Build.Build.outputs['SetMeta.base_version'] ]
-        build_number:  $[ stageDependencies.Build.Build.outputs['SetMeta.build_number'] ]
+        version: $[ stageDependencies.Build.Build.outputs['SetMeta.version'] ]
       jobs:
       - job: create_release
         pool:
@@ -153,8 +145,6 @@ extends:
                 🚀 **Automated Pre-release Build**
 
                 Version: `$(version)`
-                Base Version: `$(base_version)`
-                Build Number: `$(build_number)`
                 Commit: `$(Build.SourceVersion)`
 
                 ## Installation Options
