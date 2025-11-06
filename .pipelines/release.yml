@@ -265,4 +265,3 @@ extends:
                 #   --version $(version) `
                 #   --urls $x64MsixUrl $arm64MsixUrl `
                 #   --submit
-              pwsh: true
