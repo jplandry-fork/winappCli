@@ -66,6 +66,7 @@ extends:
             displayName: Replace Stubbed Files
             inputs:
               filePath: '.pipelines/Unstub.ps1'
+              arguments: '-TelemetryProviderGuid "$(TelemetryProviderGuid)"' 
           - template: ./.pipelines/templates/build.yaml@self
             parameters:
               stable: 'true'
