@@ -55,7 +55,9 @@ The easiest way to use the CLI is to download the latest build from GitHub Relea
 
 ### Adding to Path
 
-The easiest way to use the CLI globally is to install it via the MSIX installer
+The easiest way to use the CLI globally is to install it via the [MSIX installer](https://github.com/microsoft/WinAppCli/releases/latest).
+
+You can also add it manually: Windows Search → Edit the system environment variables → Environment Variables → Path → Edit → New → Add the location (folder) of winapp CLI.
 
 ## 📋 Usage
 
@@ -107,11 +109,17 @@ The full CLI usage can be found here: [Documentation](/docs/usage.md)
 - [File an issue, feature request or bug](https://github.com/microsoft/WinAppCli/issues): please ensure that you are not filing a duplicate issue
 - Send feedback to <windowsdevelopertoolkit@microsoft.com>: Do you love this tool? Are there features or fixes you want to see? Let us know!
 
-We are actively working on improving Node and Python support. These features are currently experimental and we are aware of several issues with these app types.
+We are actively working on improving Node and Python support. These features are experimental and we are aware of several issues with these app types.
 
 ## 🧪 Try the Windows Identity App
 
-This repository also contains an **experimental** app (GUI) that wraps the CLI and provides an intuitive, drag-and-drop experience. [See the docs](/docs/gui-usage.md) for more details.
+This repository also contains an **experimental** app (GUI) that wraps the CLI and provides an intuitive, drag-and-drop experience. [See the docs](/docs/gui-usage.md) for more details. [Download the app here](https://github.com/microsoft/WinAppCli/releases/tag/v0.1.1-gui).
+
+## 🧾 Samples
+
+This repository will continue to be added with samples. Currently the following samples exist:
+
+- [Electron sample](/samples/electron/README.md): a default Electron Forge generated application + initialized a winapp project with appxmanifest, assets + native addon + C# addon + generates cert
 
 ## Contributing
 
